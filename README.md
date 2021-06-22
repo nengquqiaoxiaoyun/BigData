@@ -37,3 +37,92 @@ RAID可以看作是一种垂直伸缩，一台计算机集成更多的磁盘实�
 
 RAID技术只是在单台服务器的多块磁盘上组成阵列，大数据需要更大规模的存储空间和更快的访问速度。将RAID思想原理应用到分布式服务器集群上，就形成了Hadoop分布式文件系统HDFS的架构思想
 
+# Hadoop
+
+## 组成
+
+![image-20210621094741314](README.assets/image-20210621094741314.png)
+
+## HDFS（Hadoop Distributed File System）
+
+# Hadoop环境搭建
+
+操作系统：CentOs7
+
+我们先搭建一个空的系统随后克隆出多个镜像即可，克隆出的镜像需要修改ip地址和主机名
+
+```shell
+sudo vim /etc/hostname
+```
+
+## 添加用户权限
+
+我们可以给账户配置root的权限，以后加上sudo即可执行root的权限命令
+
+```shell
+vim /etc/sudoers
+```
+
+```shell
+## Allows people in group wheel to run all commands
+%wheel ALL=(ALL) ALL
+```
+
+在*%wheel* 这行后面添加
+
+```shell
+usernmae ALL=(ALL) NOPASSWD:ALL
+```
+
+## 修改文件夹所属主和所属组
+
+```shell
+sudo chown username:group path
+# exp sudo chown wentimei:wentimei /opt/module
+```
+
+## 删除自带的jdk
+
+如果系统是非桌面（最小化系统）不需要执行此步骤，因为没有安装
+
+```shell
+# root
+su
+password
+# execute
+rpm -qa | grep -i java | xargs -n1 rpm -e --nodeps
+# 重启
+reboot
+```
+
+![image-20210621155027207](README.assets/image-20210621155027207.png)
+
+## 安装JDK
+
+之后我们要安装的软件只需在一台机上安装即可，其他的机子只要拷贝即可
+
+### 解压至指定目录
+
+```shell
+tar -zxvf jdk-8u212-linux-x64.tar.gz -C /opt/module/
+```
+
+### 配置环境变量
+
+查看 `/etc/profile`文件，以往我们都是在该文件下进行配置，可以看到该文件的脚本其实就是在`/etc/profile.d/*.sh` 中循环读取依赖，所以我们可以在`profile.d`中加入自己的`.sh`文件
+
+![image-20210621160035054](README.assets/image-20210621160035054.png)
+
+```shell
+vi /etc/profile.d/env.sh
+
+#JAVA_HOME
+export JAVA_HOME=/opt/module/jdk1.8.0_212
+export PATH=$PATH:$JAVA_HOME/bin
+
+#使配置生效
+source /etc/profile
+
+java -version
+```
+
