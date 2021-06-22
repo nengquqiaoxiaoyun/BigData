@@ -166,3 +166,95 @@ export PATH=$PATH:$HADOOP_HOME/sbin
 
 ![image-20210622093644939](README.assets/image-20210622093644939.png)
 
+## 文件复制
+
+### xsync脚本
+
+循环复制文件到所有节点的相同目录下
+
+```shell
+# 在/home/username/bin下创建脚本文件xsync
+cd ~
+mkdir bin
+cd bin
+vim xsync
+
+# 内容如下
+#!/bin/bash
+#1. 判断参数个数
+if [ $# -lt 1 ]
+then
+echo Not Enough Arguement!
+exit;
+fi
+
+#2. 遍历集群所有机器
+for host in hadoop2 hadoop3 hadoop4
+do
+echo ==================== $host ====================
+#3. 遍历所有目录，挨个发送
+for file in $@
+do
+#4. 判断文件是否存在
+if [ -e $file ]
+then
+#5. 获取父目录
+pdir=$(cd -P $(dirname $file); pwd)
+#6. 获取当前文件的名称
+fname=$(basename $file)
+ssh $host "mkdir -p $pdir"
+rsync -av $pdir/$fname $host:$pdir
+else
+echo $file does not exists!
+fi
+done
+done
+```
+
+修改xsync脚本的权限
+
+```shell
+chmod +x xsync
+```
+
+测试
+
+```shell
+# 在脚本目录下，将/home/wentimei/bin/ 拷贝到其他主机的相同目录
+xsync /home/wentimei/bin/
+```
+
+全局调用
+
+```shell
+sudo cp /home/wentimei/bin/xsync /bin/
+```
+
+**Note: 如果在xsync前使用了sudo则需要加上xsync的全路径名**
+
+```shell
+# 在/home/wentimei路径下
+sudo ./bin/xsync /home/wentimei/bin/
+```
+
+### scp 安全拷贝
+
+基本语法
+
+```shell
+# 命令  递归  要拷贝的文件   目标主机和路径，该路径需要确保存在
+  scp   -r    /opt/file    10.211.55.3:/opt/file
+# 该命令可以从其他主机拉取文件到本地 参数交换即可，也可以将A的文件放置C
+```
+
+### rsync
+
+用 *rsync* 做文件的复制要比 *scp* 的速度快，*rsync* 只对差异文件做更新而*scp* 是把所有文件都复制过去。
+
+```shell
+# 命令   归档拷贝、显示复制过程  要拷贝的文件   目标主机和路径，该路径需要确保存在
+  rsync   -av                    /opt/file    10.211.55.3:/opt/file
+```
+
+## ssh免秘钥登录
+
