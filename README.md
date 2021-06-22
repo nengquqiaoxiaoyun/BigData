@@ -268,7 +268,7 @@ ll
 ssh-keygen -t rsa
 ```
 
-- 将公钥拷贝至所有主机
+- 将公钥拷贝至所有主机（包括自己，自己也要）
 
 ```shell
 # .ssh目录下
@@ -280,3 +280,10 @@ ssh-copy-id hadoop4
 
 ### 免密原理
 
+![image-20210622165253895](README.assets/image-20210622165253895.png)
+
+### .ssh目录结构
+
+![image-20210622165412465](README.assets/image-20210622165412465.png)
+
+![image-20210622165421782](README.assets/image-20210622165421782.png)
