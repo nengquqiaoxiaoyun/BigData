@@ -126,3 +126,27 @@ source /etc/profile
 java -version
 ```
 
+## 安装Hadoop
+
+### 解压
+
+```shell
+# 将当前文件夹下的指定文件解压至指定目录
+tar -zxvf hadoop-3.1.3.tar.gz -C /opt/module/
+```
+
+### 配置环境变量
+
+```shell
+sudo vim /etc/profile.d/env.sh
+
+#HADOOP_HOME
+export HADOOP_HOME=/opt/module/hadoop-3.1.3
+export PATH=$PATH:$HADOOP_HOME/bin
+export PATH=$PATH:$HADOOP_HOME/sbin
+```
+
+### 目录结构
+
+![image-20210622093644939](README.assets/image-20210622093644939.png)
+
