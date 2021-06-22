@@ -258,3 +258,25 @@ sudo ./bin/xsync /home/wentimei/bin/
 
 ## ssh免秘钥登录
 
+- 生成公钥和私钥
+
+```shell
+cd ~
+cd .ssh
+ll
+# 生成公钥和私钥
+ssh-keygen -t rsa
+```
+
+- 将公钥拷贝至所有主机
+
+```shell
+# .ssh目录下
+ssh-copy-id hadoop
+ssh-copy-id hadoop2
+ssh-copy-id hadoop3
+ssh-copy-id hadoop4
+```
+
+### 免密原理
+
