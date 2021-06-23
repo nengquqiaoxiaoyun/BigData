@@ -423,6 +423,20 @@ vim mapred-site.xml
 <name>mapreduce.framework.name</name>
 <value>yarn</value>
 </property>
+  
+<property>
+  <name>yarn.app.mapreduce.am.env</name>
+  <value>HADOOP_MAPRED_HOME=/opt/module/hadoop-3.1.3</value>
+</property>
+<property>
+  <name>mapreduce.map.env</name>
+  <value>HADOOP_MAPRED_HOME=/opt/module/hadoop-3.1.3</value>
+</property>
+<property>
+  <name>mapreduce.reduce.env</name>
+  <value>HADOOP_MAPRED_HOME=/opt/module/hadoop-3.1.3</value>
+</property>
+  
 </configuration>
 ```
 
@@ -432,5 +446,62 @@ vim mapred-site.xml
 
 ```shell
 xsync /opt/module/hadoop-3.1.3/etc/hadoop/
+```
+
+## 启动
+
+### 1. 配置workers并分发
+
+```shell
+vim /opt/module/hadoop-3.1.3/etc/hadoop/workers
+
+# 将内容改为所有的主机名，注意该文件不能含有空格
+hadoop2
+hadoop3
+hadoop4
+
+xsync /opt/module/hadoop-3.1.3/etc/hadoop/workers
+```
+
+### 2. 第一次启动初始化 （仅第一次）
+
+```shell
+# hadoop目录下
+hdfs namenode -format
+```
+
+格式化 NameNode，会产生新的集群 id，导致 NameNode 和 DataNode 的集群 id 不一致，集群找
+不到已往数据。如果集群在运行过程中报错，需要重新格式化 NameNode 的话，一定要**先停止 namenode 和 datanode 进程**，并且要删除所有机器的 data 和 logs 目录**，然后再进行格式
+化
+
+### 3. 启动HDFS
+
+```shell
+# hadoop目录下，在配置了NameNode节点启动
+sbin/start-dfs.sh
+```
+
+访问地址：ip:9870 比如：10.211.55.18:9870
+
+### 4. 启动yarn
+
+```shell
+# hadoop目录下，在配置了ResourceManager的节点启动
+sbin/start-dfs.sh
+```
+
+访问地址：ip:8088比如：10.211.55.23:8088
+
+### 5. 测试
+
+```shell
+# 注意：这里是在hdfs的路径上新建input文件夹
+hadoop fs -mkdir /input
+
+# 上传文件到hdfs的/input目录下
+hadoop fs -put $HADOOP_HOME/wcinput/word.txt /input
+
+# 这边路径同上，执行过程可在yarn页面上查看
+hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-3.1.3.jar wordcount /input /output
 ```
 
