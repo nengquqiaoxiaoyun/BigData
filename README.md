@@ -287,3 +287,150 @@ ssh-copy-id hadoop4
 ![image-20210622165412465](README.assets/image-20210622165412465.png)
 
 ![image-20210622165421782](README.assets/image-20210622165421782.png)
+
+## 集群配置
+
+### 1. 配置规划
+
+![image-20210623135638873](README.assets/image-20210623135638873.png)
+
+### 2. 配置文件
+
+*Hadoop*有两类配置文件，默认配置文件和自定义配置文件
+
+- 默认配置文件
+
+默认配置文件路径为***$HADOOP_HOME/share/hadoop/xx.jar***，解析jar包获取对于的默认配置文件
+
+![image-20210623140707575](README.assets/image-20210623140707575.png)
+
+- 自定义配置文件
+
+自定义配置文件存放在***$HADOOP_HOME/etc/hadoop***下包括：
+
+**core-site.xml 、 hdfs-site.xml 、 yarn-site.xml 、 mapred-site.xml**
+
+### 3. 修改自定义配置
+
+#### 3.1 core-site.xml
+
+```shell
+# 进入配置文件目录
+cd $HADOOP_HOME/etc/hadoop
+
+vim core-site.xml
+```
+
+![image-20210623141737875](README.assets/image-20210623141737875.png)
+
+文件内容如下，将*property*放入*configuration*中即可
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<!-- 指定 NameNode 的地址 -->
+<property>
+<name>fs.defaultFS</name>
+<value>hdfs://hadoop2:8020</value>
+</property>
+<!-- 指定 hadoop 数据的存储目录 -->
+<property>
+<name>hadoop.tmp.dir</name>
+<value>/opt/module/hadoop-3.1.3/data</value>
+</property>
+<!-- 配置 HDFS 网页登录使用的静态用户为 wentimei -->
+<property>
+<name>hadoop.http.staticuser.user</name>
+<value>wentimei</value>
+</property>
+</configuration>
+```
+
+#### 3.2 hdfs-site.xml
+
+```shell
+vim hdfs-site.xml
+```
+
+文件内容如下：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<!-- nn web 端访问地址-->
+<property>
+<name>dfs.namenode.http-address</name>
+<value>hadoop2:9870</value>
+</property>
+<!-- 2nn web 端访问地址-->
+<property>
+<name>dfs.namenode.secondary.http-address</name>
+<value>hadoop4:9868</value>
+</property>
+</configuration>
+```
+
+#### 3.3 yarn-site.xml
+
+```shell
+vim yarn-site.xml
+```
+
+文件内容如下：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+<!-- 指定 MR 走 shuffle -->
+<property>
+<name>yarn.nodemanager.aux-services</name>
+<value>mapreduce_shuffle</value>
+</property>
+<!-- 指定 ResourceManager 的地址-->
+<property>
+<name>yarn.resourcemanager.hostname</name>
+<value>hadoop3</value>
+</property>
+<!-- 环境变量的继承 该配置只针对3.1.3，高版本不需要配置-->
+<property>
+<name>yarn.nodemanager.env-whitelist</name>
+<value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CO
+NF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAP
+RED_HOME</value>
+</property>
+</configuration>
+```
+
+#### 3.4 mapred-site.xml
+
+```shell
+vim mapred-site.xml
+```
+
+文件内容如下：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+<!-- 指定 MapReduce 程序运行在 Yarn 上 -->
+<property>
+<name>mapreduce.framework.name</name>
+<value>yarn</value>
+</property>
+</configuration>
+```
+
+### 4. 配置分发
+
+将所有机器的配置都改为一致
+
+```shell
+xsync /opt/module/hadoop-3.1.3/etc/hadoop/
+```
+
