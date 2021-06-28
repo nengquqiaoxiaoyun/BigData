@@ -332,7 +332,7 @@ vim core-site.xml
 <!-- 指定 NameNode 的地址 -->
 <property>
 <name>fs.defaultFS</name>
-<value>hdfs://hadoop2:8020</value>
+<value>hdfs://10.211.55.18:8020</value>
 </property>
 <!-- 指定 hadoop 数据的存储目录 -->
 <property>
@@ -362,12 +362,12 @@ vim hdfs-site.xml
 <!-- nn web 端访问地址-->
 <property>
 <name>dfs.namenode.http-address</name>
-<value>hadoop2:9870</value>
+<value>10.211.55.18:9870</value>
 </property>
 <!-- 2nn web 端访问地址-->
 <property>
 <name>dfs.namenode.secondary.http-address</name>
-<value>hadoop4:9868</value>
+<value>10.211.55.22:9868</value>
 </property>
 </configuration>
 ```
@@ -393,7 +393,7 @@ vim yarn-site.xml
 <!-- 指定 ResourceManager 的地址-->
 <property>
 <name>yarn.resourcemanager.hostname</name>
-<value>hadoop3</value>
+<value>10.211.55.23</value>
 </property>
 <!-- 环境变量的继承 该配置只针对3.1.3，高版本不需要配置-->
 <property>
@@ -471,7 +471,7 @@ hdfs namenode -format
 ```
 
 格式化 NameNode，会产生新的集群 id，导致 NameNode 和 DataNode 的集群 id 不一致，集群找
-不到已往数据。如果集群在运行过程中报错，需要重新格式化 NameNode 的话，一定要**先停止 namenode 和 datanode 进程**，并且要删除所有机器的 data 和 logs 目录**，然后再进行格式
+不到已往数据。如果集群在运行过程中报错，需要重新格式化 NameNode 的话，一定要**先停止 namenode 和 datanode 进程**，并且要删除所有机器的 data 和 logs 目录，然后再进行格式
 化
 
 ### 3. 启动HDFS
@@ -482,6 +482,8 @@ sbin/start-dfs.sh
 ```
 
 访问地址：ip:9870 比如：10.211.55.18:9870
+
+启动后应该和[配置规划](###1. 配置规划)的配置一致，下同
 
 ### 4. 启动yarn
 
@@ -505,3 +507,34 @@ hadoop fs -put $HADOOP_HOME/wcinput/word.txt /input
 hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-3.1.3.jar wordcount /input /output
 ```
 
+## 配置历史服务器
+
+```shell
+# $HADOOP_HOME/etc/hadoop
+vim mapred-site.xml
+
+# 添加如下配置
+<!-- 历史服务器端地址 -->
+<property>
+<name>mapreduce.jobhistory.address</name>
+<value>hadoop2:10020</value>
+</property>
+<!-- 历史服务器 web 端地址 -->
+<property>
+<name>mapreduce.jobhistory.webapp.address</name>
+<value>hadoop2:19888</value>
+</property>
+```
+
+### 分发
+
+```shell
+# $HADOOP_HOME/etc/hadoop
+xsync mapred-site.xml
+```
+
+### 启动
+
+```shell
+ mapred --daemon start historyserver
+```
