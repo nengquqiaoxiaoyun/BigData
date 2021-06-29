@@ -59,6 +59,16 @@ RAID技术只是在单台服务器的多块磁盘上组成阵列，大数据需�
 sudo vim /etc/hostname
 ```
 
+## 添加用户和密码
+
+```shell
+adduser hadoop
+passwd hadoop
+
+# 切换为普通用户
+login -f hadoop
+```
+
 ## 添加用户权限
 
 我们可以给账户配置root的权限，以后加上sudo即可执行root的权限命令
@@ -332,17 +342,17 @@ vim core-site.xml
 <!-- 指定 NameNode 的地址 -->
 <property>
 <name>fs.defaultFS</name>
-<value>hdfs://10.211.55.18:8020</value>
+<value>hdfs://hadoop102:8020</value>
 </property>
 <!-- 指定 hadoop 数据的存储目录 -->
 <property>
 <name>hadoop.tmp.dir</name>
 <value>/opt/module/hadoop-3.1.3/data</value>
 </property>
-<!-- 配置 HDFS 网页登录使用的静态用户为 wentimei -->
+<!-- 配置 HDFS 网页登录使用的静态用户为 hadoop -->
 <property>
 <name>hadoop.http.staticuser.user</name>
-<value>wentimei</value>
+<value>hadoop</value>
 </property>
 </configuration>
 ```
@@ -362,12 +372,12 @@ vim hdfs-site.xml
 <!-- nn web 端访问地址-->
 <property>
 <name>dfs.namenode.http-address</name>
-<value>10.211.55.18:9870</value>
+<value>hadoop102:9870</value>
 </property>
 <!-- 2nn web 端访问地址-->
 <property>
 <name>dfs.namenode.secondary.http-address</name>
-<value>10.211.55.22:9868</value>
+<value>hadoop104:9868</value>
 </property>
 </configuration>
 ```
@@ -393,7 +403,7 @@ vim yarn-site.xml
 <!-- 指定 ResourceManager 的地址-->
 <property>
 <name>yarn.resourcemanager.hostname</name>
-<value>10.211.55.23</value>
+<value>hadoop103</value>
 </property>
 <!-- 环境变量的继承 该配置只针对3.1.3，高版本不需要配置-->
 <property>
