@@ -484,6 +484,8 @@ hdfs namenode -format
 不到已往数据。如果集群在运行过程中报错，需要重新格式化 NameNode 的话，一定要**先停止 namenode 和 datanode 进程**，并且要删除所有机器的 data 和 logs 目录，然后再进行格式
 化
 
+启动namenode会在data目录下生成name目录，name目录下有版本号和后面生成的data目录版本相对应，格式化之后namenode版本会产生变化不能和原来的data版本对应，所以需要删除data和logs目录
+
 ### 3. 启动HDFS
 
 ```shell
