@@ -549,4 +549,6 @@ xsync mapred-site.xml
 
 ```shell
  mapred --daemon start historyserver
+ 
+ # 如果yarn已经启动，需要重新启动一下
 ```
