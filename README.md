@@ -59,6 +59,20 @@ RAID技术只是在单台服务器的多块磁盘上组成阵列，大数据需�
 sudo vim /etc/hostname
 ```
 
+## 查看网络情况
+
+```shell
+ifconfig
+```
+
+![image-20210630085301461](assets/image-20210630085301461.png)
+
+```shell
+cat -n /etc/sysconfig/network-scripts/ifcfg-ens192
+```
+
+![image-20210630085441234](assets/image-20210630085441234.png)
+
 ## 添加用户和密码
 
 ```shell
@@ -521,6 +535,8 @@ hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-3.1.3.jar wordcount 
 
 ## 配置历史服务器
 
+### 配置mapred-site.xml
+
 ```shell
 # $HADOOP_HOME/etc/hadoop
 vim mapred-site.xml
@@ -545,10 +561,60 @@ vim mapred-site.xml
 xsync mapred-site.xml
 ```
 
-### 启动
+### 启动（Hadoop102）
 
 ```shell
  mapred --daemon start historyserver
  
  # 如果yarn已经启动，需要重新启动一下
 ```
+
+## 开启日志聚集
+
+![image-20210630091726755](assets/image-20210630091726755.png)
+
+注意，**开启日志聚集功能需要重启yarn和历史服务器**
+
+### 1. 配置yarn-site.xml
+
+```shell
+# $HADOOP_HOME/etc/hadoop/目录下
+vim yarn-site.xml
+
+# 添加如下配置
+<!-- 开启日志聚集功能 -->
+<property>
+<name>yarn.log-aggregation-enable</name>
+<value>true</value>
+</property>
+<!-- 设置日志聚集服务器地址 -->
+<property> 
+<name>yarn.log.server.url</name> 
+<value>http://hadoop102:19888/jobhistory/logs</value>
+</property>
+<!-- 设置日志保留时间为 7 天 -->
+<property>
+<name>yarn.log-aggregation.retain-seconds</name>
+<value>604800</value>
+</property>
+```
+
+### 2. 分发
+
+```shell
+xsync $HADOOP_HOME/etc/hadoop/yarn-site.xml
+```
+
+### 3. 关闭服务后再次启动
+
+```shell
+# 关闭yarn (hadoop103)
+sbin/stop-yarn.sh
+# 关闭历史服务(hadoop102)
+mapred --daemon stop historyserver
+# 启动yarn (hadoop103)
+sbin/start-yarn.sh
+# 启动历史服务 （hadoop102）
+mapred --daemon start historyserver
+```
+
