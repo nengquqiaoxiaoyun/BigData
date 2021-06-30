@@ -39,7 +39,7 @@ RAID技术只是在单台服务器的多块磁盘上组成阵列，大数据需�
 
 # Hadoop组成
 
-![image-20210621094741314](/Users/wentimei/Github/BigData/README.assets/image-20210621094741314.png)
+![image-20210621094741314](README.assets/image-20210621094741314.png)
 
 **HDFS（Hadoop Distributed File System）**
 
@@ -59,13 +59,13 @@ sudo vim /etc/hostname
 ifconfig
 ```
 
-![image-20210630085301461](/Users/wentimei/Github/BigData/assets/image-20210630085301461.png)
+![image-20210630085301461](assets/image-20210630085301461.png)
 
 ```shell
 cat -n /etc/sysconfig/network-scripts/ifcfg-ens192
 ```
 
-![image-20210630085441234](/Users/wentimei/Github/BigData/assets/image-20210630085441234.png)
+![image-20210630085441234](assets/image-20210630085441234.png)
 
 ## 添加用户和密码
 
@@ -117,7 +117,7 @@ rpm -qa | grep -i java | xargs -n1 rpm -e --nodeps
 reboot
 ```
 
-![image-20210621155027207](/Users/wentimei/Github/BigData/README.assets/image-20210621155027207.png)
+![image-20210621155027207](README.assets/image-20210621155027207.png)
 
 ## 配置主机映射
 
@@ -145,7 +145,7 @@ tar -zxvf jdk-8u212-linux-x64.tar.gz -C /opt/module/
 
 查看 `/etc/profile`文件，以往我们都是在该文件下进行配置，可以看到该文件的脚本其实就是在`/etc/profile.d/*.sh` 中循环读取依赖，所以我们可以在`profile.d`中加入自己的`.sh`文件
 
-![image-20210621160035054](/Users/wentimei/Github/BigData/README.assets/image-20210621160035054.png)
+![image-20210621160035054](README.assets/image-20210621160035054.png)
 
 ```shell
 vi /etc/profile.d/env.sh
@@ -182,7 +182,7 @@ export PATH=$PATH:$HADOOP_HOME/sbin
 
 ### 目录结构
 
-![image-20210622093644939](/Users/wentimei/Github/BigData/README.assets/image-20210622093644939.png)
+![image-20210622093644939](README.assets/image-20210622093644939.png)
 
 ## 文件复制
 
@@ -298,19 +298,19 @@ ssh-copy-id hadoop4
 
 ### 免密原理
 
-![image-20210622165253895](/Users/wentimei/Github/BigData/README.assets/image-20210622165253895.png)
+![image-20210622165253895](README.assets/image-20210622165253895.png)
 
 ### .ssh目录结构
 
-![image-20210622165412465](/Users/wentimei/Github/BigData/README.assets/image-20210622165412465.png)
+![image-20210622165412465](README.assets/image-20210622165412465.png)
 
-![image-20210622165421782](/Users/wentimei/Github/BigData/README.assets/image-20210622165421782.png)
+![image-20210622165421782](README.assets/image-20210622165421782.png)
 
 ## 集群配置
 
 ### 1. 配置规划
 
-![image-20210623135638873](/Users/wentimei/Github/BigData/README.assets/image-20210623135638873.png)
+![image-20210623135638873](README.assets/image-20210623135638873.png)
 
 ### 2. 配置文件
 
@@ -320,7 +320,7 @@ ssh-copy-id hadoop4
 
 默认配置文件路径为***$HADOOP_HOME/share/hadoop/xx.jar***，解析jar包获取对于的默认配置文件
 
-![image-20210623140707575](/Users/wentimei/Github/BigData/README.assets/image-20210623140707575.png)
+![image-20210623140707575](README.assets/image-20210623140707575.png)
 
 - 自定义配置文件
 
@@ -339,7 +339,7 @@ cd $HADOOP_HOME/etc/hadoop
 vim core-site.xml
 ```
 
-![image-20210623141737875](/Users/wentimei/Github/BigData/README.assets/image-20210623141737875.png)
+![image-20210623141737875](README.assets/image-20210623141737875.png)
 
 文件内容如下，将*property*放入*configuration*中即可
 
@@ -565,7 +565,7 @@ xsync mapred-site.xml
 
 ## 开启日志聚集
 
-![image-20210630091726755](/Users/wentimei/Github/BigData/assets/image-20210630091726755.png)
+![image-20210630091726755](assets/image-20210630091726755.png)
 
 注意，**开启日志聚集功能需要重启yarn和历史服务器**
 
@@ -709,7 +709,7 @@ xsync /home/hadoop/bin/
 
 # 常用端口号
 
-![image-20210630103254245](/Users/wentimei/Github/BigData/assets/image-20210630103254245.png)
+![image-20210630103254245](assets/image-20210630103254245.png)
 
 # 集群时间同步
 
