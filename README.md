@@ -681,7 +681,6 @@ ssh hadoop102 "/opt/module/hadoop-3.1.3/sbin/stop-dfs.sh"
 echo "Input Args Error..."
 ;;
 esac
-
 ```
 
 ##### 3.1 权限
@@ -713,4 +712,8 @@ chmod +x jpsall
 ```shell
 xsync /home/hadoop/bin/
 ```
+
+# 常用端口号
+
+![image-20210630103254245](assets/image-20210630103254245.png)
 
