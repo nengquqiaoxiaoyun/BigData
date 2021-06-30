@@ -2,8 +2,6 @@
 
 ![image-20210621094741314](README.assets/image-20210621094741314.png)
 
-**HDFS（Hadoop Distributed File System）**
-
 # Hadoop环境搭建
 
 操作系统：CentOs7
