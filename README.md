@@ -618,3 +618,99 @@ sbin/start-yarn.sh
 mapred --daemon start historyserver
 ```
 
+## 集群启停命令及脚本
+
+### 1. 集群启停
+
+##### 整体启/停 HDFS 和 YARN
+
+```shell
+start-dfs.sh/stop-dfs.sh
+
+start-yarn.sh/stop-yarn.sh
+```
+
+### 2. 各组件单一启停
+
+##### 分别启动/停止 HDFS 组件 和 YARN组件
+
+```shell
+hdfs --daemon start/stop namenode/datanode/secondarynamenode
+
+yarn --daemon start/stop resourcemanager/nodemanager
+
+# 历史服务启停
+mapred --daemon start/stop historyserver
+```
+
+### 3. 集群启停脚本
+
+```shell
+cd ~
+cd bin
+vim cluster.sh
+
+#!/bin/bash
+if [ $# -lt 1 ]
+then
+echo "No Args Input..."
+exit ;
+fi
+case $1 in
+"start")
+echo " =================== 启动 hadoop 集群 ==================="
+echo " --------------- 启动 hdfs ---------------"
+ssh hadoop102 "/opt/module/hadoop-3.1.3/sbin/start-dfs.sh"
+echo " --------------- 启动 yarn ---------------"
+ssh hadoop103 "/opt/module/hadoop-3.1.3/sbin/start-yarn.sh"
+echo " --------------- 启动 historyserver ---------------"
+ssh hadoop102 "/opt/module/hadoop-3.1.3/bin/mapred --daemon start 
+historyserver"
+;;
+"stop")
+echo " =================== 关闭 hadoop 集群 ==================="
+echo " --------------- 关闭 historyserver ---------------"
+ssh hadoop102 "/opt/module/hadoop-3.1.3/bin/mapred --daemon stop 
+historyserver"
+echo " --------------- 关闭 yarn ---------------"
+ssh hadoop103 "/opt/module/hadoop-3.1.3/sbin/stop-yarn.sh"
+echo " --------------- 关闭 hdfs ---------------"
+ssh hadoop102 "/opt/module/hadoop-3.1.3/sbin/stop-dfs.sh"
+;;
+*)
+echo "Input Args Error..."
+;;
+esac
+
+```
+
+##### 3.1 权限
+
+```shell
+chmod +x cluster.sh
+```
+
+### 4. 查看所有机器jps脚本并设置权限
+
+```shell
+cd ~
+cd bin
+vim jpsall
+
+# input
+#!/bin/bash
+for host in hadoop102 hadoop103 hadoop104
+do
+echo =============== $host ===============
+ssh $host jps 
+done
+
+chmod +x jpsall
+```
+
+### 5. 分发脚本给所有机器
+
+```shell
+xsync /home/hadoop/bin/
+```
+
