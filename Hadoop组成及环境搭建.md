@@ -1,6 +1,6 @@
 大数据学习笔记，参考极客时间课程
 
-![image-20210616154015957](/Users/wentimei/Github/BigData/README.assets/image-20210616154015957.png)
+![image-20210616154015957](README.assets/image-20210616154015957.png)
 
 该图的所有这些框架、平台以及相关的算法共同构成了大数据的技术体系
 
