@@ -52,3 +52,5 @@ RAID技术只是在单台服务器的多块磁盘上组成阵列，大数据需�
 [Hadoop组成](./Hadoop组成及环境搭建.md)
 
 # HDFS
+
+[HDFS](./HDFS)
