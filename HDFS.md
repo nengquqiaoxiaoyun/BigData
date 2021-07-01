@@ -237,3 +237,42 @@ Note：副本超出当前机器时，假设只有三台机器，那么只能有�
 hadoop fs -setrep 10 /jinguo/shuguo.txt
 ```
 
+# 3. HDFS的API操作
+
+首先确保本地以后jdk和hadoop（和服务器版本一直）环境
+
+## 3.1 依赖及日志
+
+```xml
+<dependencies>
+<dependency>
+<groupId>org.apache.hadoop</groupId>
+<artifactId>hadoop-client</artifactId>
+<version>3.1.3</version>
+</dependency>
+<dependency>
+<groupId>junit</groupId>
+<artifactId>junit</artifactId>
+<version>4.12</version>
+</dependency>
+<dependency>
+<groupId>org.slf4j</groupId>
+<artifactId>slf4j-log4j12</artifactId>
+<version>1.7.30</version>
+</dependency>
+</dependencies>
+```
+
+在resources目录下新建log4j.properties
+
+```properties
+log4j.rootLogger=INFO, stdout 
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender 
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout 
+log4j.appender.stdout.layout.ConversionPattern=%d %p [%c] - %m%n 
+log4j.appender.logfile=org.apache.log4j.FileAppender 
+log4j.appender.logfile.File=target/spring.log 
+log4j.appender.logfile.layout=org.apache.log4j.PatternLayout 
+log4j.appender.logfile.layout.ConversionPattern=%d %p [%c] - %m%n
+```
+
