@@ -276,3 +276,91 @@ log4j.appender.logfile.layout=org.apache.log4j.PatternLayout
 log4j.appender.logfile.layout.ConversionPattern=%d %p [%c] - %m%n
 ```
 
+## 3.2 测试代码
+
+```java
+package cn.huakai;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.jar.Pack200;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-01
+ */
+public class HDFSClient {
+
+    private FileSystem fileSystem;
+
+    @Before
+    public void init() throws IOException, URISyntaxException, InterruptedException {
+        // get paramters
+        URI uri = new URI("hdfs://hadoop102:8020");
+        Configuration configuration = new Configuration();
+        String user = "hadoop";
+        fileSystem = FileSystem.get(uri, configuration, user);
+    }
+
+    @After
+    public void close() throws IOException {
+        fileSystem.close();
+    }
+
+
+    @Test
+    public void mdkir() {
+        try {
+            fileSystem.mkdirs(new Path("/xiyou"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void upload() {
+        try {
+            fileSystem.copyFromLocalFile(false, true,
+                    new Path("/Users/wentimei/Documents/学习笔记/Spring.md"),
+                    new Path("/notes/Spring.md"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+## 3.3 参数优先级
+
+1. 客户端代码参数的设置
+
+```java
+Configuration configuration = new Configuration();
+configuration.set...
+```
+
+2. 客户端ClassPath下的用户自定义配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>1</value>
+    </property>
+</configuration>
+```
+
+2. 服务器自定义配置文件
+3. 服务器默认配置
+
