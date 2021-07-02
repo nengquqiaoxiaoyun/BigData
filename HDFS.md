@@ -361,6 +361,23 @@ configuration.set...
 </configuration>
 ```
 
-2. 服务器自定义配置文件
-3. 服务器默认配置
+3. 服务器自定义配置文件
+4. 服务器默认配置
 
+## 3.4 相关API
+
+### delete
+
+### rename
+
+### copyToLocalFile
+
+### listFiles
+
+文件信息，包括权限，所有者，组等信息
+
+![image-20210702111621028](assets/image-20210702111621028.png)
+
+### listStatus
+
+是否Directory
