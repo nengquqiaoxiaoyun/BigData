@@ -1,4 +1,4 @@
-# 1. 概述
+# 1 概述
 
 ## 1.1 定义
 
@@ -56,7 +56,7 @@ HDFS默认块大小为128M（Hadoop2.X/3.X，Hadoop1.X为64M）
 - HDFS一般的访问模式是通过MapReduce程序在计算时读取，MapReduce对输入数据进行分片读取，通常一个分片就是一个数据块，每个数据块分配一个计算进程，这样就可以同时启动很多进程对一个HDFS文件的多个数据块进行并发访问，从而实现数据的高速访问
 - DataNode存储的数据块会进行复制，使每个数据块在集群里有多个备份，保证了数据的可靠性，并通过一系列的故障容错手段实现HDFS系统中主要组件的高可用，进而保证数据和整个系统的高可用
 
-# 2. HDFS的基本操作
+# 2 HDFS的基本操作
 
 ## 2.1 基本语法
 
@@ -237,7 +237,7 @@ Note：副本超出当前机器时，假设只有三台机器，那么只能有�
 hadoop fs -setrep 10 /jinguo/shuguo.txt
 ```
 
-# 3. HDFS的API操作
+# 3 HDFS的API操作
 
 首先确保本地以后jdk和hadoop（和服务器版本一直）环境
 
@@ -381,3 +381,20 @@ configuration.set...
 ### listStatus
 
 是否Directory
+
+# 4 HDFS的读写流程
+
+## 4.1 文件写入
+
+![image-20210705090457062](assets/image-20210705090457062.png)
+
+1. **客户端通过*DistributedFileSystem*调用*create()*来新建文件**
+2. ***DistributedFileSystem*对*namenode*建立一个*[RPC](https://www.zhihu.com/question/25536695)*调用并在文件系统的命名空间新建一个空（没有数据块）的文件。namenode执行各项检查确保文件不存在以及客户端是否有相应的权限。若校验通过，*namenode*会对新文件进行记录，否则，文件创建失败并向客户端抛出*IOException*。随后，*DistributedFileSystem*向客户端返回*FSDataOutputStream*对象用于开始写入数据，*FSDataOutputStream*封装的*DFSOutputStream*对象负责处理*datanodes*和*namenode*之间的通信**
+3. **当客户端写入数据时，*DFSOutputStream*将其分割成数据包并将其写入被称为*‘data queue’*的内部队列。*DataStreamer*会处理数据队列，它会选出一组适合存储数据副本的一组*datanodes*并要求*namenode* 分配新的数据块。这一组*datanodes*构成了一个管道(*piepline*)**
+4. ***DataStreamer*将数据包以流的形式传输到管道中第一个*datanode*，该*datanode*存储数据包并将它发送给第二个*datanode*，以此类推直到最后一个**
+5. **同时*DFSOutputStream*内部维护着一个称为*’ack queue‘*(确认队列)的数据包队列来等待datanode的回复。收到管道中所有的*datanode*的回复后，该数据包会从确认队列中删除**
+6. **客户端完成数据写入后对数据流调用*close()*方法**
+
+> 在数据写入期间，任何datanode发生故障时执行以下操作：
+>
+> 首先关闭管道，ack queue中的所有的packets都添加到data queue的最前端，这样可以保证故障节点的下游不会丢失任何数据包。为存储在另一个正常datanode的当前数据块指定一个新的标识，并传递给namenode以便故障datanode在恢复后可以删除存储的部分数据块。从管道中删除故障datanode，基于两个正常的datanode构建新的管道。剩下的数据块会被写入到管道中正常的datanode中
