@@ -398,3 +398,12 @@ configuration.set...
 > 在数据写入期间，任何datanode发生故障时执行以下操作：
 >
 > 首先关闭管道，ack queue中的所有的packets都添加到data queue的最前端，这样可以保证故障节点的下游不会丢失任何数据包。为存储在另一个正常datanode的当前数据块指定一个新的标识，并传递给namenode以便故障datanode在恢复后可以删除存储的部分数据块。从管道中删除故障datanode，基于两个正常的datanode构建新的管道。剩下的数据块会被写入到管道中正常的datanode中
+
+## 4.2 文件读取
+
+![image-20210705105703399](assets/image-20210705105703399.png)
+
+1. 客户端通过调用*FileSystem*对象的*open()*方法来打开希望读取的文件（对于*DistributedFileSystem*来说，这个对象是*DistributedFileSystem*的一个实例）
+2. *DistributedFileSystem*通过*RPC*调用*namenode*来确定文件起始块的位置
+3. 对于每一个块，*namenode*返回存有该块副本第*datanode*地址。*DistributedFileSystem*返回一个*FSDataInputStream*对象给客户端以便读取数据。而*FSDataInputStream*封装了*DFSInputStream*对象，该对象管理着*datanode*和*namenode*的*I/O*，接着客户端对这个输入流调用*read()*方法
+
