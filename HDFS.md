@@ -403,7 +403,14 @@ configuration.set...
 
 ![image-20210705105703399](assets/image-20210705105703399.png)
 
-1. 客户端通过调用*FileSystem*对象的*open()*方法来打开希望读取的文件（对于*DistributedFileSystem*来说，这个对象是*DistributedFileSystem*的一个实例）
-2. *DistributedFileSystem*通过*RPC*调用*namenode*来确定文件起始块的位置
-3. 对于每一个块，*namenode*返回存有该块副本第*datanode*地址。*DistributedFileSystem*返回一个*FSDataInputStream*对象给客户端以便读取数据。而*FSDataInputStream*封装了*DFSInputStream*对象，该对象管理着*datanode*和*namenode*的*I/O*，接着客户端对这个输入流调用*read()*方法
+1. **客户端通过调用*FileSystem*对象的*open()*方法来打开希望读取的文件（对于*DistributedFileSystem*来说，这个对象是*DistributedFileSystem*的一个实例）**
+2. ***DistributedFileSystem*通过*RPC*调用*namenode*来确定文件起始块的位置**
+3. **对于每一个块，*namenode*返回存有该块副本的*datanode*（datanode根据它们与客户端的距离来排序，参见[网络拓扑](###4.2.1 网络拓扑)）地址。*DistributedFileSystem*返回一个*FSDataInputStream*对象给客户端以便读取数据。而*FSDataInputStream*封装了*DFSInputStream*对象，该对象管理着*datanode*和*namenode*的*I/O*，接着客户端对这个输入流调用*read()*方法**
+4. ***DFSInputStream*随即连接距离最近的文件中第一个块所在的*datanode*，对数据流调用*read()*方法将数据从*datanode*传输到客户端**
+5. **读完一个块后*DFSInputStream*与*datanode*关闭连接，去寻找下一个最佳的*datanode***
+6. **客户端读取完成，对*FSDataInputStream*调用*close()*方法**
+
+> DFSInputStream在于datanode通信时遇到错误，会尝试从这个块的另一个最近datanode读取数据并记住故障，保证以后不会反复读该节点上后续的块。DFSInputStream也会通过校验和(checksums)确认从datanode发来的数据是否完整
+
+### 4.2.1 网络拓扑
 
