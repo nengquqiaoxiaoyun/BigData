@@ -414,3 +414,33 @@ configuration.set...
 
 ### 4.2.1 网络拓扑
 
+在*HDFS*写数据的过程中，*NameNode*会选择距离待上传数据最近距离的*DataNode*接收数据。
+
+节点距离：两个节点到达最近的共同祖先的距离总和。
+
+![image-20210705153250824](assets/image-20210705153250824.png)
+
+# 5 DataNode
+
+## 5.1 DataNode工作机制
+
+![image-20210705153459078](assets/image-20210705153459078.png)
+
+## 5.2 掉线时参数设置
+
+![image-20210705153649372](assets/image-20210705153649372.png)
+
+***heartbeat.recheck.interval*的单位为毫秒，*dfs.heartbeat.interval*的单位为秒**
+
+```xml
+# hdfs-site.xml
+<property>
+<name>dfs.namenode.heartbeat.recheck-interval</name>
+<value>300000</value>
+</property>
+<property>
+<name>dfs.heartbeat.interval</name>
+<value>3</value>
+</property>
+```
+
