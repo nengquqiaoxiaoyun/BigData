@@ -621,3 +621,230 @@ MapReduce确保每个reducer的输入都是按Key排序的。系统执行排序�
 每次内存缓冲区达到溢出阈值就会新建一个溢出文件，因此在map任务写完其最后一个输出记录之后，会有几个溢出文件。在任务完成前，溢出文件将被合并成一个已分区且以排序的输出文件。默认最多一次合并10个，如果至少存在3个溢出文件，则combiner就会在输出文件写道磁盘之前再次运行（combiner可以在输入上反复运行，不会影响最终结果）如果少于3个溢出文件，由于map输出规模少，combiner调用带来的开销是不划算的，因此不会为map输出再次运行combiner
 
 在map输出写到磁盘的过程中对它进行压缩可以使写磁盘的速度更快，节约磁盘空间并且可以减少传给reducer的数据量
+
+## 4.3 reduce端
+
+## 4.4 分区
+
+### 4.4.1 需求
+
+![image-20210708153616054](assets/image-20210708153616054.png)
+
+### 4.4.2 实现
+
+#### 分区类
+
+在[Driver](###Driver)的基础上添加分区类实现Partitioner<K,V>，泛型是Mapper的输入k和v
+
+```java
+package cn.huakai.v4_4_1;
+
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Partitioner;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-08
+ */
+public class ProvincePartitioner extends Partitioner<Text, FlowDTO> {
+
+    @Override
+    public int getPartition(Text text, FlowDTO flowDTO, int numPartitions) {
+        // 手机号前3位
+        String prePhone = text.toString().substring(0, 3);
+
+        return PartitinerEnum.getPartitionerByPre(prePhone);
+
+    }
+}
+
+```
+
+#### 枚举类
+
+用于处理分区类型的枚举类
+
+```java
+package cn.huakai.v4_4_1;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-08
+ */
+public enum PartitinerEnum {
+
+    /**
+     * 分区0
+     */
+    P0(0, "136"),
+    /**
+     * 分区1
+     */
+    P1(1, "137"),
+    P2(2, "138"),
+    P3(3, "139"),
+    P4(4, "other");
+
+    private int partitioner;
+
+    /**
+     * 前缀
+     */
+    private String pre;
+
+    private String desc;
+
+    public int getPartitioner() {
+        return partitioner;
+    }
+
+    public void setPartitioner(int partitioner) {
+        this.partitioner = partitioner;
+    }
+
+    public String getPre() {
+        return pre;
+    }
+
+    public void setPre(String pre) {
+        this.pre = pre;
+    }
+
+    public String getDesc() {
+        return desc;
+    }
+
+    public void setDesc(String desc) {
+        this.desc = desc;
+    }
+
+    PartitinerEnum() {
+    }
+
+    PartitinerEnum(int partitioner) {
+        this.partitioner = partitioner;
+    }
+
+
+    PartitinerEnum(int partitioner, String pre) {
+        this.partitioner = partitioner;
+        this.pre = pre;
+    }
+
+    public static int getPartitionerByPre(String pre) {
+        PartitinerEnum[] values = PartitinerEnum.values();
+        for (PartitinerEnum value : values) {
+            if (pre.equals(value.pre))
+                return value.partitioner;
+        }
+
+        return P4.getPartitioner();
+    }
+}
+
+```
+
+#### Driver
+
+添加关于分区的设置
+
+```java
+job.setPartitionerClass(ProvincePartitioner.class);
+job.setNumReduceTasks(5);
+```
+
+```java
+package cn.huakai.v4_4_1;
+
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import java.io.IOException;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-07
+ */
+public class FlowDriver {
+
+    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
+        Job job = Job.getInstance();
+
+        // jar
+        job.setJarByClass(FlowDriver.class);
+
+        // mapper and reducer
+        job.setMapperClass(FlowMapper.class);
+        job.setReducerClass(FlowReducer.class);
+
+        // map output key & value
+        job.setMapOutputValueClass(Text.class);
+        job.setMapOutputValueClass(FlowDTO.class);
+
+        // output key & value
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(FlowDTO.class);
+        
+        // partitioner
+        job.setPartitionerClass(ProvincePartitioner.class);
+        job.setNumReduceTasks(5);
+
+        // fileinput & output
+        FileInputFormat.setInputPaths(job, new Path("/Users/wentimei/Downloads/phone_data.txt"));
+        FileOutputFormat.setOutputPath(job, new Path("/Users/wentimei/Downloads/output"));
+
+        // submit
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+
+    }
+
+    public static class FlowMapper extends Mapper<LongWritable, Text, Text, FlowDTO> {
+        private FlowDTO flowDTO = new FlowDTO();
+        private Text outKey = new Text();
+
+        // 1	13736230513	192.196.100.1	www.atguigu.com	2481	24681	200
+        @Override
+        protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            String[] split = value.toString().split("\t");
+            String phone = split[1];
+            // 因为前面的数据不全，切割后数据不一致，而后面数据完整，从后切割即可保证数据正确
+            String upFlow = split[split.length - 3];
+            String downFlow = split[split.length - 2];
+            flowDTO.setUpFlow(Long.valueOf(upFlow));
+            flowDTO.setDownFlow(Long.parseLong(downFlow));
+            flowDTO.setSumFlow();
+            outKey.set(phone);
+            context.write(outKey, flowDTO);
+        }
+    }
+
+    public static class FlowReducer extends Reducer<Text, FlowDTO, Text, FlowDTO> {
+        private FlowDTO flowDTO = new FlowDTO();
+        @Override
+        protected void reduce(Text key, Iterable<FlowDTO> values, Context context) throws IOException, InterruptedException {
+
+            Long totalUp = 0l;
+            Long totalDown = 0l;
+            for (FlowDTO value : values) {
+                totalUp += value.getUpFlow();
+                totalDown += value.getDownFlow();
+            }
+            flowDTO.setUpFlow(totalUp);
+            flowDTO.setDownFlow(totalDown);
+            flowDTO.setSumFlow();
+
+            context.write(key,flowDTO);
+        }
+    }
+}
+```
+
+### 4.4.3 总结
+
+![image-20210708160521641](assets/image-20210708160521641.png)
