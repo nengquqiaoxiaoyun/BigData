@@ -588,7 +588,7 @@ public List<InputSplit> getSplits(JobContext job) throws IOException {
 
 **这是框架默认的切片机制，不管文件多小都会是一个单独的切片，当有当量小文件时会产生大量的切片也就是会有大量的MapTask导致处理效率低下**
 
-### ConbineFileInputFormat
+### CombineFileInputFormat
 
 #### CombineTextInputFormat
 
@@ -605,6 +605,12 @@ CombineTextInputFormat用于处理小文件过多的场景，它将多个小文�
 ![image-20210708105342129](assets/image-20210708105342129.png)
 
 ![image-20210708105352443](assets/image-20210708105352443.png)
+
+#### 如何更改切片机制
+
+在Driver类中设置即可
+
+`job.setInputFormatClass(xxInputFormat.class)`
 
 ## 4.2 Shuffle
 
@@ -856,6 +862,8 @@ public class FlowDriver {
 排序是MapReduce的核心技术
 
 ![image-20210708161648495](assets/image-20210708161648495.png)
+
+**Mapper的输出key必须经过排序！**
 
 ### 部分排序
 
