@@ -857,15 +857,232 @@ public class FlowDriver {
 
 ![image-20210708161648495](assets/image-20210708161648495.png)
 
-## 部分排序
+### 部分排序
 
 MapReduce根据输入记录的Key对数据集排序，保证输出的每个文件内部有序
 
-## 全排序
+案列：
+
+![image-20210709093136151](assets/image-20210709093136151.png)
+
+在全排序的基础上加上分区类并在驱动类中设置即可
+
+```java
+package cn.huakai.v_4_5.sort2;
+
+import cn.huakai.v4_4_1.PartitinerEnum;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Partitioner;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-09
+ */
+public class ProvincePartitioner extends Partitioner<FlowDTO, Text> {
+
+    @Override
+    public int getPartition(FlowDTO flowDTO, Text text, int numPartitions) {
+        String pre = text.toString().substring(0, 3);
+        return PartitinerEnum.getPartitionerByPre(pre);
+    }
+}
+```
+
+```java
+// partitioner
+job.setPartitionerClass(ProvincePartitioner.class);
+job.setNumReduceTasks(5);
+```
+
+### 全排序
 
 最简单的方法是使用一个分区（job.setNumReduceTasks(1)），该方法在处理大型文件时效率极低，因为一台机器必须处理所有的输出文件，从而完全丧失了MapReduce所提供的并行架构的优势
 
-## 辅助排序
+案列描述：如果Mapper输出的key是实体类就需要让实体类实现序列化和排序
+
+```java
+package cn.huakai.v_4_5.sort1;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import java.io.IOException;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-07
+ */
+public class FlowDriver {
+
+    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
+        Configuration configuration = new Configuration();
+        Job job = Job.getInstance(configuration);
+
+        // jar
+        job.setJarByClass(FlowDriver.class);
+
+        // mapper and reducer
+        job.setMapperClass(FlowMapper.class);
+        job.setReducerClass(FlowReducer.class);
+
+        // map output key & value
+        job.setMapOutputValueClass(FlowDTO.class);
+        job.setMapOutputValueClass(Text.class);
+
+        // output key & value
+        job.setOutputKeyClass(FlowDTO.class);
+        job.setOutputValueClass(Text.class);
+
+        // fileinput & output
+        FileInputFormat.setInputPaths(job, new Path("/Users/wentimei/Downloads/phone_data.txt"));
+        FileOutputFormat.setOutputPath(job, new Path("/Users/wentimei/Downloads/output"));
+
+        // submit
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+
+    }
+
+    public static class FlowMapper extends Mapper<LongWritable, Text, FlowDTO, Text> {
+        private FlowDTO flowDTO = new FlowDTO();
+        private Text outKey = new Text();
+
+        // 1	13736230513	192.196.100.1	www.atguigu.com	2481	24681	200
+        @Override
+        protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            String[] split = value.toString().split("\t");
+            flowDTO.setUpFlow(Long.parseLong(split[split.length - 3]));
+            flowDTO.setDownFlow(Long.parseLong(split[split.length - 2]));
+            flowDTO.setSumFlow();
+
+            outKey.set(split[1]);
+
+            context.write(flowDTO, outKey);
+        }
+    }
+
+    public static class FlowReducer extends Reducer<FlowDTO, Text, Text, FlowDTO> {
+
+        @Override
+        protected void reduce(FlowDTO key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            for (Text value : values) {
+                context.write(value, key);
+            }
+        }
+    }
+}
+```
+
+```java
+package cn.huakai.v_4_5.sort1;
+
+import org.apache.hadoop.io.WritableComparable;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
+/**
+ * 流量传输对象
+ *
+ * @author: huakaimay
+ * @since: 2021-07-07
+ */
+public class FlowDTO implements WritableComparable<FlowDTO> {
+
+    /**
+     * 上行流量
+     */
+    private Long upFlow;
+
+    /**
+     * 下行流量
+     */
+    private Long downFlow;
+
+    /**
+     * 总流量
+     */
+    private Long sumFlow;
+
+    public Long getUpFlow() {
+        return upFlow;
+    }
+
+    public void setUpFlow(Long upFlow) {
+        this.upFlow = upFlow;
+    }
+
+    public Long getDownFlow() {
+        return downFlow;
+    }
+
+    public void setDownFlow(Long downFlow) {
+        this.downFlow = downFlow;
+    }
+
+    public Long getSumFlow() {
+        return sumFlow;
+    }
+
+    public void setSumFlow(Long sumFlow) {
+        this.sumFlow = sumFlow;
+    }
+
+    public void setSumFlow() {
+        this.sumFlow = this.upFlow + this.downFlow;
+    }
+
+    @Override
+    public void write(DataOutput out) throws IOException {
+        out.writeLong(upFlow);
+        out.writeLong(downFlow);
+        out.writeLong(sumFlow);
+    }
+
+    @Override
+    public void readFields(DataInput in) throws IOException {
+        upFlow = in.readLong();
+        downFlow = in.readLong();
+        sumFlow = in.readLong();
+    }
+
+    @Override
+    public String toString() {
+        return upFlow + "\t" + downFlow + "\t" + sumFlow;
+    }
+
+    @Override
+    public int compareTo(FlowDTO o) {
+        if (this.sumFlow > o.sumFlow)
+            return -1;
+        else if (this.sumFlow < o.sumFlow)
+            return 1;
+        else
+            return 0;
+    }
+}
+
+```
+
+### 辅助排序
 
 在Reduce端对key进行分组。应用于：在接收的key为bean对象时，想让一个或几个字段相同（全部
 字段比较不相同）的key进入到同一个reduce方法时，可以采用分组排序
+
+## 4.6 combiner
+
+Hadoop允许用户针对map任务的输出指定一个combiner（想mapper和reducer一样定义），combiner函数的输出作为reduce函数的输入。combiner是一种优化方案，Hadoop无法确定要对一个指定的map任务输出记录调用多少次combiner。也就是说无论调用多少次combiner，reducer的输出结果都是一样的
+
+combiner可以对每个MapTask的输出进行局部汇总，减少网络网络传输量使得reduce执行效率更高 
+
+案列：
+
+![image-20210709100543263](assets/image-20210709100543263.png)
+
