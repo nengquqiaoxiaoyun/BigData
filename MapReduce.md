@@ -1082,7 +1082,113 @@ Hadoop允许用户针对map任务的输出指定一个combiner（想mapper和red
 
 combiner可以对每个MapTask的输出进行局部汇总，减少网络网络传输量使得reduce执行效率更高 
 
-案列：
+案列：统计单词次数，可以使用combiner提前计算每个单词的总量以减少reduce的计算
+
+combiner和reducer一样继承Reducer<K, V>，然后在驱动类设置combiner即可
+
+`job.setCombinerClass(xxCombiner.class)`
+
+若combiner和reducer的功能完全一样则可以在驱动类设置combiner，指定reducer类即可
+
+`job.setCombinerClass(xxReducer.class)`
 
 ![image-20210709100543263](assets/image-20210709100543263.png)
+
+```java
+package cn.huakai.v4_6;
+
+import cn.huakai.WordCountDriver;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import java.io.IOException;
+import java.util.Arrays;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-09
+ */
+public class WordContDriver {
+
+    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
+
+        Job job = Job.getInstance();
+        job.setJarByClass(WordContDriver.class);
+
+        job.setMapperClass(WrodCountMapper.class);
+        job.setReducerClass(WrodCountReducer.class);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(LongWritable.class);
+
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(LongWritable.class);
+        job.setCombinerClass(WordCombiner.class);
+
+        FileInputFormat.setInputPaths(job, new Path("/Users/wentimei/Downloads/hello.txt"));
+        FileOutputFormat.setOutputPath(job, new Path("/Users/wentimei/Downloads/combinerOutput"));
+
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+
+    }
+
+    public static class WrodCountMapper extends Mapper<LongWritable, Text, Text, LongWritable> {
+        private Text outKey = new Text();
+        private LongWritable times = new LongWritable(1);
+
+        @Override
+        protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            Arrays.stream(value.toString().split(" "))
+                    .forEach(line -> {
+                        outKey.set(line);
+                        try {
+                            context.write(outKey, times);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    });
+
+
+        }
+    }
+
+    public static class WrodCountReducer extends Reducer<Text, LongWritable, Text, LongWritable> {
+        private LongWritable outValue = new LongWritable();
+        @Override
+        protected void reduce(Text key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+            long sum = 0;
+            for (LongWritable value : values) {
+                sum += value.get();
+            }
+            outValue.set(sum);
+
+            context.write(key, outValue);
+        }
+    }
+
+    public static class WordCombiner extends Reducer<Text, LongWritable, Text, LongWritable> {
+        private LongWritable outValue = new LongWritable();
+        @Override
+        protected void reduce(Text key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+            long sum = 0;
+            for (LongWritable value : values) {
+                sum += value.get();
+            }
+            outValue.set(sum);
+
+            context.write(key, outValue);
+        }
+    }
+}
+
+```
 
