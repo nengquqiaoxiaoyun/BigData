@@ -1229,7 +1229,7 @@ TextOutputFormat是默认的输出格式，它把每条记录写为文本。每�
 
 自定义输出类型时需要继承FileOutputFormat并改写getRecordWriter方法，返回一个具体的RecordWriter类（自定义），重写自定义Writer的相关方法
 
-#### 需求
+#### 案例
 
 过滤输入文件将包含特定字符的文字放到一个目录，其他的放到另一个目录
 
@@ -1371,6 +1371,32 @@ public class OutputDriver {
 
 }
 ```
+
+## 4.7 join
+
+MapReduce能够执行大型数据集间的join操作，join操作如果是由mapper执行，则称为map端连接，如果由reducer执行，则称为reduce端连接
+
+采用map端连接还是reduce端连接则取决于数据的组织方式
+
+### reduce端连接
+
+**reduce端连接的效率往往比map端要低且极易产生数据倾斜**
+
+#### 案例
+
+![image-20210714155518546](assets/image-20210714155518546.png)
+
+将商品信息表中数据根据商品pid合并到订单数据表中
+
+最终输出如下
+
+![image-20210714155548252](assets/image-20210714155548252.png)
+
+
+
+### map端连接
+
+#### 案例
 
 # 常用正则表达式
 
