@@ -1668,11 +1668,52 @@ public class MapJoinDriver {
 }
 ```
 
-# 常用正则表达式
+## 4.8 ETL数据清洗
+
+ETL（Extract-Transform-Load）用来描述将数据从源端经过抽取、转换、加载至目的端的过程
+
+在运行核心业务MapReduce程序之前，往往要先对数据进行清洗，清理掉不符合用户要求的数据。**清理的过程往往只需要运行Mapper程序，不需要运行Reduce程序**
+
+```java
+import java.io.IOException;
+
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+
+public class WebLogMapper extends Mapper<LongWritable, Text, Text,
+        NullWritable> {
+    @Override
+    protected void map(LongWritable key, Text value, Context context)
+            throws IOException, InterruptedException {
+
+        String line = value.toString();
+        boolean result = parseLog(line, context);
+
+        if (!result) {
+            return;
+        }
+
+        context.write(value, NullWritable.get());
+    }
+
+    private boolean parseLog(String line, Context context) {
+        String[] fields = line.split(" ");
+        if (fields.length > 11) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+```
+
+### 常用正则表达式
 
 https://www.cnblogs.com/clarke157/p/6430311.html
 
-## 一、校验数字的表达式
+#### 校验数字的表达式
 
 1 数字：^[0-9]*$
 
@@ -1712,7 +1753,7 @@ https://www.cnblogs.com/clarke157/p/6430311.html
 
 19 浮点数：`^(-?\d+)(\.\d+)?$ 或 ^-?([1-9]\d*\.\d*|0\.\d*[1-9]\d*|0?\.0+|0)$`
 
-## 二、校验字符的表达式
+#### 校验字符的表达式
 
 1 汉字：^[\u4e00-\u9fa5]{0,}$
 
@@ -1738,7 +1779,7 @@ https://www.cnblogs.com/clarke157/p/6430311.html
 
 12 禁止输入含有~的字符：`[^~\x22]+`
 
-## 三、特殊需求表达式
+#### 特殊需求表达式
 
 1 Email地址：^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$
 
