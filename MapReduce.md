@@ -1374,9 +1374,9 @@ public class OutputDriver {
 
 ## 4.7 join
 
-MapReduce能够执行大型数据集间的join操作，join操作如果是由mapper执行，则称为map端连接，如果由reducer执行，则称为reduce端连接
+**MapReduce能够执行大型数据集间的join操作，join操作如果是由mapper执行，则称为map端连接，如果由reducer执行，则称为reduce端连接**
 
-采用map端连接还是reduce端连接则取决于数据的组织方式
+**采用map端连接还是reduce端连接则取决于数据的组织方式**
 
 ### reduce端连接
 
@@ -1399,6 +1399,7 @@ MapReduce能够执行大型数据集间的join操作，join操作如果是由map
 1. reduce时的实体类不能直接赋值，因为这边被处理过了。意思就是只会保留一个下来，所以需要将实体类拷贝出来（BeanUtils.copyProperties(desc, orig)）
 2. 传输实体类时虽然不用作为key来排序，但是还是需要实现序列化用于传输，否则会空指针
 3. 实体类用不到的属性要给默认值，不然传输过程中会空指针
+4. **当使用实体类作为key写时(context.write(bean, NullWritable.get()))，实体类没有复制的属性不会被写出**
 
 ```java
 package cn.huakai.v4_7.reduce;
@@ -1539,7 +1540,133 @@ public class ReduceJoinDriver {
 
 ### map端连接
 
+可以在map端提前缓存多张表，提前处理业务逻辑，这样可以增加map端业务，减少reduce端数据的压力
+
+**map端join的逻辑不需要reduce阶段`job.setNumReduceTasks(0)`**
+
+#### DistributedCache
+
+**缓存方案：**
+
+1. 在mapper的初始化阶段（setup()）将文件读取到缓存中
+2. 在Driver驱动类中加载缓存
+
+```java
+//缓存普通文件到 Task 运行节点。
+job.addCacheFile(new URI("file:///e:/cache/pd.txt"));
+//如果是集群运行,需要设置 HDFS 路径
+job.addCacheFile(new URI("hdfs://hadoop102:8020/cache/pd.txt"));
+```
+
 #### 案例
+
+案列和reduce端一致，这次我们交给map处理
+
+```java
+package cn.huakai.v4_7.map;
+
+import cn.huakai.v4_7.TableBean;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+
+/**
+ * map-side join
+ *
+ * @author: huakaimay
+ * @since: 2021-07-15
+ */
+public class MapJoinDriver {
+
+    public static void main(String[] args) throws IOException, URISyntaxException, InterruptedException, ClassNotFoundException {
+        Job job = Job.getInstance();
+
+        job.setJarByClass(MapJoinDriver.class);
+
+        job.setMapperClass(MapJoinMapper.class);
+
+        job.setMapOutputKeyClass(TableBean.class);
+        job.setMapOutputValueClass(NullWritable.class);
+
+        job.setOutputKeyClass(TableBean.class);
+        job.setOutputValueClass(NullWritable.class);
+
+        FileInputFormat.setInputPaths(job,new Path("/Volumes/梅花开/大数据/尚硅谷大数据技术之Hadoop3.x/资料/11_input/inputtable/order.txt"));
+        FileOutputFormat.setOutputPath(job, new Path("/Users/wentimei/Downloads/v47map"));
+
+        job.setNumReduceTasks(0);
+
+        // cache
+        job.addCacheFile(new URI("file:///Volumes/梅花开/大数据/尚硅谷大数据技术之Hadoop3.x/资料/11_input/inputtable/pd.txt"));
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+
+    /**
+     * map端join不需要reducer
+     */
+    public static class MapJoinMapper extends Mapper<LongWritable, Text, TableBean, NullWritable> {
+        private HashMap<String, String> cacheMap = new HashMap<>();
+
+        @Override
+        protected void setup(Context context) throws IOException, InterruptedException {
+            URI[] cacheFiles = context.getCacheFiles();
+            Path path = new Path(cacheFiles[0]);
+
+            FileSystem fileSystem = FileSystem.get(context.getConfiguration());
+            FSDataInputStream fsDataInputStream = fileSystem.open(path);
+
+            BufferedReader reader = new BufferedReader(new
+                    InputStreamReader(fsDataInputStream, "UTF-8"));
+
+            // 逐行读取
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] split = line.split("\t");
+                // pid pname
+                cacheMap.put(split[0], split[1]);
+            }
+
+            IOUtils.closeStream(reader);
+        }
+
+        /**
+         * 该value是order表中的每行数据
+         * 将数据和缓存文件中的数据进行匹配
+         */
+        @Override
+        protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            TableBean tableBean = new TableBean();
+            String[] split = value.toString().split("\t");
+
+            // id pid amount
+            String pid = split[1];
+            String pname = cacheMap.get(pid);
+            tableBean.setId(split[0]);
+            tableBean.setAmout(Long.parseLong(split[2]));
+            tableBean.setPname(pname);
+            // expect: id pname amount
+            context.write(tableBean, NullWritable.get());
+        }
+    }
+}
+```
 
 # 常用正则表达式
 
