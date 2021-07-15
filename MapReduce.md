@@ -1394,7 +1394,148 @@ MapReduce能够执行大型数据集间的join操作，join操作如果是由map
 
 #### 实现
 
+注意点：
 
+1. reduce时的实体类不能直接赋值，因为这边被处理过了。意思就是只会保留一个下来，所以需要将实体类拷贝出来（BeanUtils.copyProperties(desc, orig)）
+2. 传输实体类时虽然不用作为key来排序，但是还是需要实现序列化用于传输，否则会空指针
+3. 实体类用不到的属性要给默认值，不然传输过程中会空指针
+
+```java
+package cn.huakai.v4_7.reduce;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-14
+ */
+public class ReduceJoinDriver {
+
+    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
+        Job job = Job.getInstance();
+
+        job.setJarByClass(ReduceJoinDriver.class);
+
+        job.setMapperClass(ReduceJoinMapper.class);
+        job.setReducerClass(ReduceJoinReducer.class);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(TableBean.class);
+
+        job.setOutputKeyClass(TableBean.class);
+        job.setOutputValueClass(NullWritable.class);
+
+
+        FileInputFormat.setInputPaths(job, new Path("/Volumes/梅花开/大数据/尚硅谷大数据技术之Hadoop3.x/资料/11_input/inputtable"));
+        FileOutputFormat.setOutputPath(job, new Path("/Users/wentimei/Downloads/v47"));
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+
+    /**
+     * outputkey & value :
+     * pid & bean
+     */
+    public static class ReduceJoinMapper extends Mapper<LongWritable, Text, Text, TableBean> {
+        private String originFileName;
+        private Text outKey = new Text();
+
+        /**
+         * 初始化：
+         * 通过split获取文件名
+         */
+        @Override
+        protected void setup(Context context) throws IOException, InterruptedException {
+            FileSplit fileSplit = (FileSplit) context.getInputSplit();
+            // exp: abc.txt
+            originFileName = fileSplit.getPath().getName();
+        }
+
+        @Override
+        protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            String line = value.toString();
+            String[] split = line.split("\t");
+
+            TableBean tableBean = new TableBean();
+            if (originFileName.contains("order")) {
+                outKey.set(split[1]);
+
+                tableBean.setId(split[0]);
+                tableBean.setPid(split[1]);
+                tableBean.setAmout(Long.parseLong(split[2]));
+                tableBean.setFileName("order");
+                tableBean.setPname("");
+            } else {
+                outKey.set(split[0]);
+
+                tableBean.setId("");
+                tableBean.setAmout(0l);
+                tableBean.setPname(split[1]);
+                tableBean.setPid(split[0]);
+                tableBean.setFileName("pd");
+            }
+
+            context.write(outKey, tableBean);
+        }
+    }
+
+    /**
+     * outputkey:
+     * bean
+     */
+    public static class ReduceJoinReducer extends Reducer<Text, TableBean, TableBean, NullWritable> {
+        @Override
+        protected void reduce(Text key, Iterable<TableBean> values, Context context) throws IOException, InterruptedException {
+
+            ArrayList<TableBean> order = new ArrayList<>();
+            TableBean pd = new TableBean();
+
+            for (TableBean value : values) {
+                if ("order".equals(value.getFileName())) {
+                    // order表 应该是集合
+                    TableBean temp = new TableBean();
+                    copyProperties(temp, value);
+                    order.add(temp);
+                } else {
+                    // pd表 应该是bean
+                    copyProperties(pd, value);
+                }
+            }
+
+            for (TableBean tableBean : order) {
+                tableBean.setPname(pd.getPname());
+                context.write(tableBean, NullWritable.get());
+            }
+
+        }
+    }
+
+    private static void copyProperties(Object desc, Object orig) {
+        try {
+            BeanUtils.copyProperties(desc, orig);
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
+
+}
+```
 
 ### map端连接
 
