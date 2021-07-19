@@ -119,3 +119,71 @@ root
 
 > 公平调度器具体配置详见Hadoop权威指南P90
 
+# 4 常用命令
+
+## 4.1 查看任务
+
+```shell
+# 列出所有的Application
+yarn application -list
+
+# 根据Application任务状态过滤
+yarn application -list -appStates （所有状态：ALL、NEW、
+NEW_SAVING、SUBMITTED、ACCEPTED、RUNNING、FINISHED、FAILED、KILLED）
+yarn application -list -appStates FINISHED
+
+# kill Application
+yarn yarn application -kill <ApplicationId>
+```
+
+## 4.2 查看日志
+
+```shell
+# 查询Application日志
+yarn logs -applicationId <ApplicationId>
+
+# 查询Container日志
+yarn logs -applicationId <ApplicationId> -containerId <ContainerId>
+```
+
+## 4.3 查看尝试运行的任务
+
+```shell
+# 列出所有APplication尝试的列表
+yarn applicationattempt -list <ApplicationId>
+
+# 打印ApplicationAttemp状态
+yarn applicationattempt -status <ApplicationAttemptId>
+```
+
+## 4.4 查看容器
+
+```shell
+# 列出所有Container
+yarn container -list <ApplicationAttemptId>
+
+# 打印Container状态 只有在任务跑的图中才能看到container的状态
+yarn container -status <ContainerId>
+```
+
+## 4.5 查看节点状态
+
+```shell
+# 列出所有节点
+yarn node -list -all
+```
+
+## 4.6 更新配置
+
+```shell
+# 加载队列配置
+yarn rmadmin -refreshQueues
+```
+
+## 4.7 查看队列
+
+```shell
+# 打印队列消息
+yarn queue -status <QueueName>
+```
+
