@@ -1859,7 +1859,7 @@ https://www.cnblogs.com/clarke157/p/6430311.html
 
 ![image-20210715111048531](assets/image-20210715111048531.png)
 
-注：LZO文件已经在预处理过程中被索引了，那么LZO文件时可切分的，否则不可以切分
+注：LZO文件已经在预处理过程中被索引了，那么LZO文件是可切分的，否则不可以切分
 
 是否可切片表示是否可以搜索数据流的任意位置并进一步往下读取数据，可切片压缩格式尤其适合MapReduce
 
@@ -1869,13 +1869,13 @@ https://www.cnblogs.com/clarke157/p/6430311.html
 
 ## 压缩和输入分片
 
-再考虑如何压缩将由MapReduce处理的数据时，理解这些压缩格式是否支持切片(splitting)是非常重要的
+在考虑如何压缩将由MapReduce处理的数据时，理解这些压缩格式是否支持切片(splitting)是非常重要的
 
 使用哪种压缩格式与待处理的文件的大小、格式和所使用的工具相关。应重点考虑压缩/解压缩速度、压缩率、压缩后是否可以支持切片
 
 压缩可以在MapReduce作用的任意阶段启用（三个阶段，Map输入、Map输出、Reduce输出）
 
-1. Map输入阶段
+1. Map输入阶段（无需显示指定）
 
 数据量小于块大小，考虑压缩速度：**LZO/Snappy**
 
@@ -1890,3 +1890,49 @@ https://www.cnblogs.com/clarke157/p/6430311.html
 如果数据需要永久保存，考虑压缩率：Bzip2/Gzip
 
 如果作为下一个MapReduce输入，考虑数据量大小问题（回到Map输入阶段的考虑）
+
+## codec
+
+codec是压缩-解压缩算法的一种实现，在Hadoop中一个对CompressionCodec接口的实现代表了一个code。例如：GzipCodec包装了gzip的压缩和解压缩算法
+
+![image-20210719090046437](assets/image-20210719090046437.png)
+
+## 在MapReduce中使用压缩
+
+要在Hadoop中启用压缩，可以配置如下参数
+
+![image-20210719090313924](assets/image-20210719090313924.png)
+
+### map输出
+
+设置一下两个属性即可
+
+```java
+Configuration conf = new Configuration();
+// 开启map端压缩
+conf.setBoolean("mapreduce.map.output.compress", true);
+// 设置压缩方式
+conf.setClass("mapreduce.map.output.compress.codec", BZip2Codec.class, CompressionCodec.class);
+```
+
+### recude输出
+
+方式一：设置两个属性即可
+
+```java
+Configuration conf = new Configuration();
+// 开启reduce端压缩
+conf.setBoolean("mapreduce.output.fileoutputformat.compress", true);
+// 设置压缩方式
+conf.setClass("mapreduce.output.fileoutputformat.compress.codec", BZip2Codec.class, CompressionCodec.class);
+```
+
+方式二：在FileOutputFormat中使用
+
+```java
+// 开启reduce端压缩
+FileOutputFormat.setCompressOutput(job, true);
+// 压缩方式
+FileOutputFormat.setOutputCompressorClass(job, BZip2Codec.class);
+```
+
