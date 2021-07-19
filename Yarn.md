@@ -30,7 +30,7 @@ Yarn进行资源分配的单位是容器（Container），每个容器包含了�
 
 ​	Yarn中有三种调度器可用：FIFO调度器（FIFO Scheduler），容量调度器（Capacity Scheduler）和公平调度器（Fair Scheduler）
 
-具体设置详见：yarn-default.xml 文件
+具体设置详见：yarn-default.xml 文件（修改时修改yarn-site.xml文件）
 
 ```xml
 <property>
@@ -46,7 +46,7 @@ Yarn进行资源分配的单位是容器（Container），每个容器包含了�
 
 ​	FIFO调度器的优点是简单易懂，不需要任何配置，但是**不适合共享集群**。大的应用会占用集群中的所有资源，所以每个应用必须等待直到轮到自己运行。在一个共享集群中，更适合使用容量调度器或公平调度器。这两种调度器都允许长时间运行的作业能及时完成，同时也允许正在进行较小临时查询的用户能够在合理时间内得到返回结果
 
-## 3.2 容量调度器（Capacity Scheduler）
+## 3.2 Capacity Scheduler 容量调度器
 
 ​	容量调度器允许多个组织共享一个Hadoop集群，每个组织可以分配到全部集群资源的一部分。每个组织被分配一个专门的队列（**多队列**），每个队列被配置为可以使用一定的集群资源，**在一个队列内，使用FIFO调度策略对应用进行调度**
 
@@ -55,3 +55,67 @@ Yarn进行资源分配的单位是容器（Container），每个容器包含了�
 ![image-20210719143306707](assets/image-20210719143306707.png)
 
 ![image-20210719143700643](assets/image-20210719143700643.png)
+
+
+
+假设一个队列的层次结构如下
+
+root 
+
+├── prod 
+
+└── dev 
+
+├── eng 
+
+└── science 
+
+一下配置是一个基于上述队列层次的容量调度器配置文件，名为`capacity-scheduler.xml`
+
+```xml
+# $HADOOP_HOME/etc/hadoop
+<?xml version="1.0"?> 
+<configuration> 
+<property> 
+	<name>yarn.scheduler.capacity.root.queues</name> 
+	<value>prod,dev</value> 
+</property> 
+<property> 
+	<name>yarn.scheduler.capacity.root.dev.queues</name> 
+	<value>eng,science</value> 
+</property> 
+<property> 
+	<name>yarn.scheduler.capacity.root.prod.capacity</name> 
+	<value>40</value> 
+</property> 
+<property> 
+	<name>yarn.scheduler.capacity.root.dev.capacity</name> 
+	<value>60</value> 
+</property> 
+<property> 
+	<name>yarn.scheduler.capacity.root.dev.maximum-capacity</name>
+  <value>75</value>
+</property> 
+<property> 
+	<name>yarn.scheduler.capacity.root.dev.eng.capacity</name> 
+	<value>50</value> 
+</property> 
+<property> 
+	<name>yarn.scheduler.capacity.root.dev.science.capacity</name> 
+	<value>50</value> 
+</property> 
+</configuration>
+```
+
+该配置表示：在root队列下定义两个队列，分别占40%和60%的容量。对特定队列进行配置时，通过以下形式`yarn.scheduler.capacity.<queue-path>.<sub-property>`进行设置
+
+## 3.3 Fair Scheduler 公平调度器
+
+​	公平调度器皆在为所有运行的应用公平分配资源。使用公平调度器时，不需要预留一定量的资源，因为调度器所在所有运行的作业之间动态平衡资源。第一个作业启动时，它也是唯一运行的作业，因而获得集群中所有的资源。当第二个作业启动时，它被分配到集群的一半资源，这样每个作业都能公平分享资源
+
+​	从第二作业的启动到获得公平共享资源之间会有时间滞后，因为它必须等待第一个作业使用的容器用完并释放出资源
+
+![image-20210719150101204](assets/image-20210719150101204.png) 
+
+> 公平调度器具体配置详见Hadoop权威指南P90
+
