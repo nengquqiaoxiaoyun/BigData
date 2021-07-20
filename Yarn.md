@@ -826,3 +826,6 @@ public class WordCountDriver {
 }
 ```
 
+# 9 总结
+
+![image-20210720144247689](assets/image-20210720144247689.png)
