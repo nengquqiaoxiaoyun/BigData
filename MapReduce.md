@@ -1936,3 +1936,6 @@ FileOutputFormat.setCompressOutput(job, true);
 FileOutputFormat.setOutputCompressorClass(job, BZip2Codec.class);
 ```
 
+# 6 总结
+
+![image-20210720144400878](assets/image-20210720144400878.png)
