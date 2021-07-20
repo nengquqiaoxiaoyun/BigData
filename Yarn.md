@@ -608,3 +608,221 @@ mapreduce.job.priority=5 5 2000000
 **或者使用[命令](##4.9 任务优先级)**修改正在执行任务的优先级
 
 # 7 多队列公平调度器
+
+1. **修改`yarn-site.xml`**
+
+```xml
+<property>
+	<name>yarn.resourcemanager.scheduler.class</name>
+	<value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairS
+	cheduler</value>
+	<description>配置使用公平调度器</description>
+</property>
+<property>
+	<name>yarn.scheduler.fair.allocation.file</name>
+	<value>/opt/module/hadoop-3.1.3/etc/hadoop/fair-scheduler.xml</value>
+	<description>指明公平调度器队列分配配置文件</description>
+</property>
+<property>
+	<name>yarn.scheduler.fair.preemption</name>
+	<value>false</value>
+	<description>禁止队列间资源抢占</description>
+</property>
+```
+
+2. **配置`fair-scheduler.xml`**
+
+```xml
+<?xml version="1.0"?>
+<allocations>
+  <!-- 
+  单个队列中 Application Master 占用资源的最大比例,取值 0-1 ，企业一般配置 0.1 
+  -->
+  <queueMaxAMShareDefault>0.5</queueMaxAMShareDefault>
+  <!-- 单个队列最大资源的默认值 test atguigu default -->
+  <queueMaxResourcesDefault>4096mb,4vcores</queueMaxResourcesDefault>
+<!-- 增加一个队列 test -->
+<queue name="test">
+  <!-- 队列最小资源 -->
+  <minResources>2048mb,2vcores</minResources>
+  <!-- 队列最大资源 -->
+  <maxResources>4096mb,4vcores</maxResources>
+  <!-- 队列中最多同时运行的应用数，默认 50，根据线程数配置 -->
+  <maxRunningApps>4</maxRunningApps>
+  <!-- 队列中 Application Master 占用资源的最大比例 -->
+  <maxAMShare>0.5</maxAMShare>
+  <!-- 该队列资源权重,默认值为 1.0 -->
+  <weight>1.0</weight>
+  <!-- 队列内部的资源分配策略 -->
+  <schedulingPolicy>fair</schedulingPolicy>
+</queue>
+<!-- 增加一个队列 atguigu -->
+<queue name="atguigu" type="parent">
+  <!-- 队列最小资源 -->
+  <minResources>2048mb,2vcores</minResources>
+  <!-- 队列最大资源 -->
+  <maxResources>4096mb,4vcores</maxResources>
+  <!-- 队列中最多同时运行的应用数，默认 50，根据线程数配置 -->
+  <maxRunningApps>4</maxRunningApps>
+  <!-- 队列中 Application Master 占用资源的最大比例 -->
+  <maxAMShare>0.5</maxAMShare>
+  <!-- 该队列资源权重,默认值为 1.0 -->
+  <weight>1.0</weight>
+  <!-- 队列内部的资源分配策略 --> 
+  <schedulingPolicy>fair</schedulingPolicy>
+</queue>
+<!-- 任务队列分配策略,可配置多层规则,从第一个规则开始匹配,直到匹配成功 -->
+<queuePlacementPolicy>
+  <!-- 提交任务时指定队列,如未指定提交队列,则继续匹配下一个规则; false 表示：如果指
+  定队列不存在,不允许自动创建-->
+  <rule name="specified" create="false"/>
+  <!-- 提交到 root.group.username 队列,若 root.group 不存在,不允许自动创建；若
+  root.group.user 不存在,允许自动创建 -->
+  <rule name="nestedUserQueue" create="true">
+  <rule name="primaryGroup" create="false"/>
+  </rule>
+  <!-- 最后一个规则必须为 reject 或者 default。Reject 表示拒绝创建提交失败，
+  default 表示把任务提交到 default 队列 -->
+  <rule name="reject" />
+</queuePlacementPolicy>
+</allocations>
+```
+
+分发配置并重启yarn
+
+# 8 TOOL
+
+```shell
+hadoop jar xx.jar xx.WordCount /input /output1
+```
+
+如上命令可以正常运行，当我们需要动态传参时就会有异常发生
+
+```shell
+hadoop jar xx.jar xx.WordCount -D mapreduce.job.queuename=root.test /input /output1
+```
+
+我们需要实现TOOL接口，实现所有的方法，并通过ToolRunner.run()来运行原来的程序
+
+```java
+package cn.huakai.yarn.v8;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.Tool;
+
+import java.io.IOException;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-07-20
+ */
+public class WordCount implements Tool {
+    private Configuration conf;
+
+
+    @Override
+    public int run(String[] args) throws Exception {
+        Job job = Job.getInstance(conf);
+        job.setJarByClass(WordCountDriver.class);
+
+        job.setMapperClass(WrodCountMapper.class);
+        job.setReducerClass(WordCountReducer.class);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(LongWritable.class);
+
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(LongWritable.class);
+
+        FileInputFormat.setInputPaths(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        return job.waitForCompletion(true) ? 0 : 1;
+    }
+
+    @Override
+    public void setConf(Configuration conf) {
+        this.conf = conf;
+    }
+
+    @Override
+    public Configuration getConf() {
+        return conf;
+    }
+
+
+    public static class WrodCountMapper extends Mapper<LongWritable, Text, Text, LongWritable> {
+        private Text outK = new Text();
+        private LongWritable longWritable = new LongWritable(1);
+
+        @Override
+        protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            String line = value.toString();
+            String[] split = line.split(" ");
+
+            for (String nKey : split) {
+                outK.set(nKey);
+                context.write(outK, longWritable);
+            }
+
+        }
+    }
+
+    public static class WordCountReducer extends Reducer<Text, LongWritable, Text, LongWritable> {
+        private LongWritable outV = new LongWritable(0);
+
+        @Override
+        protected void reduce(Text key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+            long sum = 0l;
+            for (LongWritable value : values) {
+                sum += value.get();
+            }
+            outV.set(sum);
+            context.write(key, outV);
+        }
+    }
+}
+
+```
+
+```java
+package cn.huakai.yarn.v8;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
+import java.util.Arrays;
+
+public class WordCountDriver {
+
+    private static Tool tool;
+
+    public static void main(String[] args) throws Exception {
+        Configuration configuration = new Configuration();
+
+
+        switch (args[0]) {
+            case "wordcount":
+                tool = new WordCount();
+                break;
+            default:
+                throw new RuntimeException("no such tool" + args[0]);
+        }
+
+        String[] strings = Arrays.copyOfRange(args, 1, args.length);
+
+
+        ToolRunner.run(configuration, tool, strings);
+    }
+}
+```
+
