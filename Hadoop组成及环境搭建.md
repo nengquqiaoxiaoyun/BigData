@@ -265,6 +265,10 @@ ssh-copy-id hadoop4
 
 ![image-20210622165421782](README.assets/image-20210622165421782.png)
 
+##### authorized_keys
+
+我们需要本地机器ssh访问远程服务器时为了减少输入密码的步骤，基本上都会在本地机器生成ssh公钥，然后将本地ssh公钥复制到远程服务器的.ssh/authorized_keys中，这样就可以免密登录了
+
 ## 集群配置
 
 ### 1. 配置规划
