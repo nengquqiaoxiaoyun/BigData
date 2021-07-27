@@ -42,3 +42,11 @@ HBase自动把表水平划分成区域（Region），每个区域都由表中行
 
 ![image-20210727153415168](assets/image-20210727153415168.png)
 
+## 1.2 实现
+
+正如HDFS和YARN是有客户端、从属机（slave）和协调主控机（master）组成，HBase也采用相同的模型，它用一个`master`节点协调管理一个或多个`regionserver`从属机
+
+![image-20210727154322480](assets/image-20210727154322480.png)
+
+![image-20210727154756818](assets/image-20210727154756818.png)
+
