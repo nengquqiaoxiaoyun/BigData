@@ -78,10 +78,10 @@ export HBASE_MANAGES_ZK=false
 
 ```xml
 <configuration>
-  <!-- 对应hdfs -->
+  <!-- 对应hdfs namenode内部通信端口 -->
 <property>
 	<name>hbase.rootdir</name>
-	<value>hdfs://hadoop102:9000/HBase</value>
+	<value>hdfs://hadoop102:8020/HBase</value>
 </property>
 <property>
 	<name>hbase.cluster.distributed</name>
@@ -94,7 +94,7 @@ export HBASE_MANAGES_ZK=false
 </property>
 <property> 
 	<name>hbase.zookeeper.quorum</name>
-	<value>hadoop102, hadoop103, hadoop104</value>
+	<value>hadoop102,hadoop103,hadoop104</value>
 </property>
   <!-- 指定zk的dataDir 要和zk对应 -->
 <property> 
@@ -145,4 +145,222 @@ lrwxrwxrwx. 1 hadoop hadoop   49 7月  28 09:22 hdfs-site.xml -> /opt/module/had
 **配置完成后分发服务到各节点**
 
 ## 2.1 启动
+
+```shell
+[hadoop@hadoop102 bin]$ pwd
+/opt/module/hbase-1.3.1/bin
+[hadoop@hadoop102 bin]$ ll
+总用量 184
+-rwxr-xr-x. 1 hadoop hadoop  4826 11月  7 2016 draining_servers.rb
+-rwxr-xr-x. 1 hadoop hadoop  1652 9月  21 2016 get-active-master.rb
+-rwxr-xr-x. 1 hadoop hadoop  5805 11月  7 2016 graceful_stop.sh
+-rwxr-xr-x. 1 hadoop hadoop 14999 11月  7 2016 hbase
+-rwxr-xr-x. 1 hadoop hadoop  4541 9月  21 2016 hbase-cleanup.sh
+-rw-r--r--. 1 hadoop hadoop 13421 11月  7 2016 hbase.cmd
+-rwxr-xr-x. 1 hadoop hadoop  1537 9月  21 2016 hbase-common.sh
+-rw-r--r--. 1 hadoop hadoop  2363 9月  21 2016 hbase-config.cmd
+-rwxr-xr-x. 1 hadoop hadoop  4724 4月   5 2017 hbase-config.sh
+-rwxr-xr-x. 1 hadoop hadoop  9450 4月   5 2017 hbase-daemon.sh
+-rwxr-xr-x. 1 hadoop hadoop  1605 4月   5 2017 hbase-daemons.sh
+-rwxr-xr-x. 1 hadoop hadoop   876 9月  21 2016 hbase-jruby
+-rwxr-xr-x. 1 hadoop hadoop  7943 4月   5 2017 hirb.rb
+-rwxr-xr-x. 1 hadoop hadoop  1912 4月   5 2017 local-master-backup.sh
+-rwxr-xr-x. 1 hadoop hadoop  1858 4月   5 2017 local-regionservers.sh
+-rwxr-xr-x. 1 hadoop hadoop  2271 9月  21 2016 master-backup.sh
+-rwxr-xr-x. 1 hadoop hadoop 17047 4月   5 2017 region_mover.rb
+-rwxr-xr-x. 1 hadoop hadoop  2527 4月   5 2017 regionservers.sh
+-rwxr-xr-x. 1 hadoop hadoop  4700 11月  7 2016 region_status.rb
+drwxr-xr-x. 2 hadoop hadoop    33 7月  28 09:01 replication
+-rwxr-xr-x. 1 hadoop hadoop  5711 4月   5 2017 rolling-restart.sh
+-rwxr-xr-x. 1 hadoop hadoop  1693 11月  7 2016 shutdown_regionserver.rb
+-rw-r--r--. 1 hadoop hadoop  2262 9月  21 2016 start-hbase.cmd
+-rwxr-xr-x. 1 hadoop hadoop  1986 4月   5 2017 start-hbase.sh
+-rw-r--r--. 1 hadoop hadoop  1752 9月  21 2016 stop-hbase.cmd
+-rwxr-xr-x. 1 hadoop hadoop  2236 9月  21 2016 stop-hbase.sh
+drwxr-xr-x. 2 hadoop hadoop    38 7月  28 09:01 test
+-rwxr-xr-x. 1 hadoop hadoop  1537 11月  7 2016 thread-pool.rb
+-rwxr-xr-x. 1 hadoop hadoop  1870 9月  21 2016 zookeepers.sh
+```
+
+Master和RegionServer逐一启动
+
+```shell
+hbase-daemon.sh start master
+
+hbase-daemon.sh start regionserver
+```
+
+注意各节点的时间是否一致，如果超过默认的30分钟就会异常
+
+`$hbase/conf/hbase-site.xml`可以修改机器允许的时间差（不建议时间差异过大）
+
+```xml
+<property>
+	<name>hbase.master.maxclockskew</name>
+	<value>180000</value>
+	<description>Time difference of regionserver from master</description>
+</property>
+```
+
+一建启/停
+
+```shell
+start-hbase.sh
+
+stop-hbase.sh
+```
+
+启动成功后即可通过页面来访问：`http://hadoop102:16010/`
+
+# 3 HBase Shell
+
+首先要进入hbase客户端命令行 
+
+```shell
+[hadoop@hadoop102 hbase-1.3.1]$ bin/hbase shell
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/opt/module/hbase-1.3.1/lib/slf4j-log4j12-1.7.5.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/opt/module/hadoop-3.1.3/share/hadoop/common/lib/slf4j-log4j12-1.7.25.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.slf4j.impl.Log4jLoggerFactory]
+HBase Shell; enter 'help<RETURN>' for list of supported commands.
+Type "exit<RETURN>" to leave the HBase Shell
+Version 1.3.1, r930b9a55528fe45d8edce7af42fef2d35e77677a, Thu Apr  6 19:36:54 PDT 2017
+
+hbase(main):001:0> 
+```
+
+使用`help`查看命令
+
+![image-20210728153338068](assets/image-20210728153338068.png)
+
+重点关注`ddl、dml、namespace`下的命令
+
+## namespace
+
+```
+Group name: namespace
+Commands: alter_namespace, create_namespace, describe_namespace, drop_namespace, list_namespace, list_namespace_tables
+```
+
+### list_namespace
+
+查看有哪些命名空间，可以有多个命名空间，一个命名空间可以有多个表
+
+```shell
+hbase(main):003:0> list_namespace
+NAMESPACE                                                                                                                                                                           
+default                                                                                                                                                                             
+hbase                                                                                                                                                                               
+2 row(s) in 0.0260 seconds
+
+hbase(main):004:0> 
+```
+
+## create_namespace
+
+```shell
+hbase(main):007:0> create_namespace 'ck'
+0 row(s) in 0.9150 seconds
+```
+
+## ddl
+
+ddl包含关于表结构的操作
+
+```
+Group name: ddl
+Commands: alter, alter_async, alter_status, create, describe, disable, disable_all, drop, drop_all, enable, enable_all, exists, get_table, is_disabled, is_enabled, list, locate_region, show_filters
+```
+
+### list
+
+查看当前数据库有哪些表
+
+```shell
+hbase(main):002:0> list
+TABLE                                                                                                                                                                               
+0 row(s) in 0.1790 seconds
+
+=> []
+hbase(main):003:0> 
+```
+
+### alter
+
+```shell
+# 给表添加一个列族
+hbase(main):028:0> alter 'ck:stu',NAME='info'
+Updating all regions with the new schema...
+1/1 regions updated.
+Done.
+0 row(s) in 2.1930 seconds
+```
+
+### create
+
+创建表和列族
+
+```shell
+hbase(main):017:0> create 'ck:stu', 'addr'
+0 row(s) in 1.3150 seconds
+
+=> Hbase::Table - ck:stu
+```
+
+### describle
+
+查看表结构信息 
+
+```shell
+hbase(main):020:0> describe 'ck:stu'
+Table ck:stu is ENABLED                                                                                                                                                             
+ck:stu                                                                                                                                                                              
+COLUMN FAMILIES DESCRIPTION                                                                                                                                                         
+{NAME => 'addr', BLOOMFILTER => 'ROW', VERSIONS => '1', IN_MEMORY => 'false', KEEP_DELETED_CELLS => 'FALSE', DATA_BLOCK_ENCODING => 'NONE', TTL => 'FOREVER', COMPRESSION => 'NONE',
+ MIN_VERSIONS => '0', BLOCKCACHE => 'true', BLOCKSIZE => '65536', REPLICATION_SCOPE => '0'}                                                                                         
+1 row(s) in 0.0270 seconds
+
+hbase(main):021:0> 
+```
+
+## dml
+
+dml包含对表数据的操作
+
+```
+Group name: dml
+Commands: append, count, delete, deleteall, get, get_counter, get_splits, incr, put, scan, truncate, truncate_preserve
+```
+
+### put
+
+```shell
+hbase(main):059:0>  put 'ck:stu','1001','info:sex','male'
+0 row(s) in 0.0850 seconds
+```
+
+### get
+
+```shell
+# 查看指定行
+hbase(main):065:0> get 'ck:stu', '100'
+COLUMN                                         CELL                                                                                                                                 
+0 row(s) in 0.0250 seconds
+
+# 查看指定列族
+hbase(main):066:0> get 'ck:stu', '1001', 'info'
+COLUMN                                         CELL                                                                                                                                 
+ info:sex                                      timestamp=1627459711626, value=male                                                                                                  
+1 row(s) in 0.0160 seconds
+```
+
+### scan
+
+```shell
+hbase(main):064:0> scan 'ck:stu'
+ROW                                            COLUMN+CELL                                                                                                                          
+ 1001                                          column=info:sex, timestamp=1627459711626, value=male                                                                                 
+1 row(s) in 0.0160 seconds
+```
 
