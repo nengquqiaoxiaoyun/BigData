@@ -74,7 +74,7 @@ export HBASE_MANAGES_ZK=false
 
 ![image-20210728090510213](assets/image-20210728090510213.png)
 
-`$hbase/conf/hbase-site.xml`
+`$hbase/conf/hbase-site.xml`**根据实际情况修改！**
 
 ```xml
 <configuration>
