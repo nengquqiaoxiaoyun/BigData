@@ -50,3 +50,99 @@ HBase自动把表水平划分成区域（Region），每个区域都由表中行
 
 ![image-20210727154756818](assets/image-20210727154756818.png)
 
+# 2 部署
+
+HBase依赖于ZooKeeper和Hadoop，安装HBase之前先将ZooKeeper和Hadoop部署并启动
+
+将HBase解压至指定目录
+
+```shell
+tar -zxvf hbase-1.3.1-bin.tar.gz -C /opt/module
+```
+
+修改配置文件(这边使用$hbase表示hbase主目录)
+
+`$hbase/conf/hbase-env.sh`
+
+```shell
+# $JAVA_HOME根据自身情况替换为实际路径
+export JAVA_HOME=$JAVA_HOME
+export HBASE_MANAGES_ZK=false
+```
+
+注释掉如下两行（仅JDK7需要用到）
+
+![image-20210728090510213](assets/image-20210728090510213.png)
+
+`$hbase/conf/hbase-site.xml`
+
+```xml
+<configuration>
+  <!-- 对应hdfs -->
+<property>
+	<name>hbase.rootdir</name>
+	<value>hdfs://hadoop102:9000/HBase</value>
+</property>
+<property>
+	<name>hbase.cluster.distributed</name>
+	<value>true</value>
+</property>
+<!-- 0.98 后的新变动，之前版本没有.port,默认端口为 60000 -->
+<property>
+	<name>hbase.master.port</name>
+	<value>16000</value>
+</property>
+<property> 
+	<name>hbase.zookeeper.quorum</name>
+	<value>hadoop102, hadoop103, hadoop104</value>
+</property>
+  <!-- 指定zk的dataDir 要和zk对应 -->
+<property> 
+	<name>hbase.zookeeper.property.dataDir</name>
+	<value>/opt/module/zookeeper-3.6.3/zkData</value>
+</property>
+</configuration>
+```
+
+`$hbase/conf/regionservers`添加所有需要的hbase节点，准确来说应该是`regionserver`的节点（类似于Hadoop的wookers）
+
+```
+hadoop102
+hadoop103
+hadoop104
+```
+
+将Hadoop配置[软件接](https://www.cnblogs.com/kex1n/p/5193826.html)到HBase
+
+> 当 我们需要在不同的目录，用到相同的文件时，我们不需要在每一个需要的目录下都放一个必须相同的文件，我们只要在某个固定的目录，放上该文件，然后在其它的 目录下用ln命令链接（link）它就可以，不必重复的占用磁盘空间。例如：ln -s /bin/less /usr/local/bin/less
+> -s 是代号（symbolic）的意思。
+> 这里有两点要注意：第一，ln命令会保持每一处链接文件的同步性，也就是说，不论你改动了哪一处，其它的文件都会发生相同的变化；第二，ln的链接又软链接 和硬链接两种，软链接就是ln -s ,它只会在你选定的位置上生成一个文件的镜像，不会占用磁盘空间，硬链接ln ,没有参数-s, 它会在你选定的位置上生成一个和源文件大小相同的文件，无论是软链接还是硬链接，文件都保持同步变化
+
+```shell
+# core-site 这边我的Hadoop路径为/opt/module/hadoop-3.1.3
+# 我的实际操作位 ln -s /opt/module/hadoop-3.1.3/etc/hadoop/core-site.xml /opt/module/hbase-1.3.1/conf/core-site.xm
+# 下同
+ln -s $HADOOP_HOME/etc/hadoop/core-site.xml $hbase/conf/core-site.xm
+# hdfs-site
+# ln -s /opt/module/hadoop-3.1.3/etc/hadoop/hdfs-site.xml /opt/module/hbase-1.3.1/conf/hdfs-site.xml
+ln -s $HADOOP_HOME/etc/hadoop/hdfs-site.xml $hbase/conf/hdfs-site.xml
+
+
+[hadoop@hadoop102 conf]$ ln -s /opt/module/hadoop-3.1.3/etc/hadoop/hdfs-site.xml /opt/module/hbase-1.3.1/conf/hdfs-site.xml
+[hadoop@hadoop102 conf]$ ll
+总用量 40
+lrwxrwxrwx. 1 hadoop hadoop   49 7月  28 09:22 core-site.xm -> /opt/module/hadoop-3.1.3/etc/hadoop/core-site.xml
+-rw-r--r--. 1 hadoop hadoop 1811 9月  21 2016 hadoop-metrics2-hbase.properties
+-rw-r--r--. 1 hadoop hadoop 4537 11月  7 2016 hbase-env.cmd
+-rw-r--r--. 1 hadoop hadoop 7513 7月  28 09:06 hbase-env.sh
+-rw-r--r--. 1 hadoop hadoop 2257 9月  21 2016 hbase-policy.xml
+-rw-r--r--. 1 hadoop hadoop  934 9月  21 2016 hbase-site.xml
+lrwxrwxrwx. 1 hadoop hadoop   49 7月  28 09:22 hdfs-site.xml -> /opt/module/hadoop-3.1.3/etc/hadoop/hdfs-site.xml
+-rw-r--r--. 1 hadoop hadoop 4722 4月   5 2017 log4j.properties
+-rw-r--r--. 1 hadoop hadoop   30 7月  28 09:15 regionservers
+```
+
+**配置完成后分发服务到各节点**
+
+## 2.1 启动
+
