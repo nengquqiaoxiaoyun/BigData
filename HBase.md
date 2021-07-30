@@ -42,13 +42,56 @@ HBase自动把表水平划分成区域（Region），每个区域都由表中行
 
 ![image-20210727153415168](assets/image-20210727153415168.png)
 
+HBase作为Google BigTable的开源实现，完整地继承了BigTable的优良设计。架构上通过数据分片的设计配合HDFS，实现了数据的分布式海量存储；数据结构上通过列族的设计，实现了数据表结构可以在运行期自定义；存储上通过LSM树的方式，使数据可以通过连续写磁盘的方式保存数据，极大地提高了数据写入性能
+
 ## 1.2 实现
+
+Reference：[HBase架构](https://www.huaweicloud.com/articles/31192a16656cfe2280689f3866e7cbb8.html)
 
 正如HDFS和YARN是有客户端、从属机（slave）和协调主控机（master）组成，HBase也采用相同的模型，它用一个`master`节点协调管理一个或多个`regionserver`从属机
 
 ![image-20210727154322480](assets/image-20210727154322480.png)
 
 ![image-20210727154756818](assets/image-20210727154756818.png)
+
+> HBase 的主从结构主要由三部分组成。Region Server 用于服务数据的读写，当访问数据时，客户端直接与 HBase RegionServer 交互
+>
+> Region 的分配（region assignment），DDL（create，delete tables）的操作由 HBase Master 处理。Zookeepr，作为HDFS的一部分，用于维持一个活跃的集群状态
+
+## 1.3 HBase第一次读写
+
+> HBase 中有个特殊的目录（Catalog） 表，称为META table，它保存集群里所有regions 的位置信息。Zookeeper保存META table的位置信息。
+>
+> 当一个客户端对 HBase 进行第一次读或写实，会发生以下过程：
+>
+> 1. 客户端从Zookeeper 获取存放了META table 的Region server 信息
+> 2. 客户端query .META. server，根据需要访问的行键范围，从 .META. server获取存储对应row key范围的region server。客户端将这个信息以及META table的位置信息加入缓存
+> 3. 从对应的 Region Server 获取对应行信息
+>
+> 对于之后的读操作，客户端使用缓存获取 META的位置，以及之前访问过的行键。随着时间的推移，客户端可以不需要query META 表，除非在访问时返回 miss（由于region被移动），然后客户端会 re-query 并更新缓存
+
+![image-20210730110326245](assets/image-20210730110326245.png)
+
+### 1.3.1 HBase写
+
+> 当客户端发起一个Put请求时，第一步是将数据写入到 write-ahead 日志（WAL）：
+>
+> 1. 编辑（edit）操作会被添加到（存储在磁盘上的）WAL 文件的末尾
+> 2. WAL用于：在服务器挂掉时，恢复尚未持久化的数据
+
+![image-20210730110926139](assets/image-20210730110926139.png)
+
+> 当数据被写入 WAL后，它会被放入MemStore（内存）。然后，put 请求会被ack，并返回给客户端
+
+![image-20210730110947449](assets/image-20210730110947449.png)
+
+> **HBase Region Flush**
+>
+> 当 MemStore 聚集了足够的数据时，整个排序好的数据会被写入到HDFS 里的一个新HFile中。HBase对每个列族使用多个HFile，它们包含真正的数据单元（或 KeyValue 实例）。这些文件随着MemStores 里不断增加的 KeyValue 编辑操作后，作为文件被flushed 到磁盘
+>
+> 值得注意的是，这是为什么HBase 里对列族数量有限制的一个原因。每个列族都会有一个MemStore，当一个已经满时，它们所有的都会被flush。它也会保存最后一次写的序列号，以此让系统得知当前持久化的进度
+>
+> 最高的序列号（sequence number）被作为一个meta field 保存在每个 HFile 中，以此反应持久化终止在哪，并应从哪里继续。当一个region 启动后，序列号会被读取，然后最高的会被用于最新编辑操作的序列号
 
 # 2 部署
 
@@ -288,6 +331,8 @@ hbase(main):003:0>
 
 ### alter
 
+针对表信息进行修改
+
 ```shell
 # 给表添加一个列族
 hbase(main):028:0> alter 'ck:stu',NAME='info'
@@ -295,6 +340,10 @@ Updating all regions with the new schema...
 1/1 regions updated.
 Done.
 0 row(s) in 2.1930 seconds
+
+# 让某一列族版本为3，意思就是进行进行put替换时会保留最近的3次数据（但是能用的还是最新的那个，只不过可以看到历史的3次数据） 
+alter 'ck:stu', {NAME=>'info',VERSIONS=>3}
+get 'ck:stu', '1001',{COLUMN=>'info:name',VERSIONS=>3}
 ```
 
 ### create
@@ -336,8 +385,12 @@ Commands: append, count, delete, deleteall, get, get_counter, get_splits, incr, 
 ### put
 
 ```shell
+# 对同一个row key（看成是主键）第一次是插入
 hbase(main):059:0>  put 'ck:stu','1001','info:sex','male'
 0 row(s) in 0.0850 seconds
+
+# 第二次则跟新
+hbase(main):059:0>  put 'ck:stu','1001','info:sex','famale'
 ```
 
 ### get
@@ -362,5 +415,53 @@ hbase(main):064:0> scan 'ck:stu'
 ROW                                            COLUMN+CELL                                                                                                                          
  1001                                          column=info:sex, timestamp=1627459711626, value=male                                                                                 
 1 row(s) in 0.0160 seconds
+```
+
+### delete
+
+```shell
+# 删除某个主键下的某个属性
+hbase(main):011:0> delete 'ck:stu', '1001', 'info:sex'
+0 row(s) in 0.0330 seconds
+
+# 删除某个row key的所有数据
+hbase(main):021:0> deleteall 'ck:stu', '1001'
+0 row(s) in 0.0040 seconds
+
+hbase(main):022:0> scan 'ck:stu'
+ROW                                            COLUMN+CELL                                                                                                                          
+0 row(s) in 0.0120 seconds
+```
+
+### truncate
+
+```shell
+# 清空表的所有数据
+hbase(main):023:0> truncate 'ck:stu'
+Truncating 'ck:stu' table (it may take a while):
+ - Disabling table...
+ - Truncating table...
+0 row(s) in 3.9380 seconds
+```
+
+### drop
+
+```shell
+# 使用drop前要先让表失效
+hbase(main):029:0> drop 'ck:stu'
+
+ERROR: Table ck:stu is enabled. Disable it first.
+
+Here is some help for this command:
+Drop the named table. Table must first be disabled:
+  hbase> drop 't1'
+  hbase> drop 'ns1:t1
+  
+--------------
+hbase(main):030:0> disable 'ck:stu'
+0 row(s) in 2.2480 seconds
+
+hbase(main):031:0> drop 'ck:stu'
+0 row(s) in 1.2640 seconds
 ```
 
