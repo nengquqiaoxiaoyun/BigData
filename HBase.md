@@ -114,7 +114,10 @@ Reference:
 - Region级别限制：随着数据的增长，Region中**所有**的MemStore达到了`hbase.hregion.memstore.flush.size * hbase.hregion.memstore.block.multiplier(默认值4)`，也就是`128 * 4 = 512MB`的时候，除了触发刷写之外，HBase还会在刷写的时候阻塞所有写入该Store的写请求
 - RegionServer级别限制：如果整个RegionServer的MenStore暂用内存总和大于`hbase.regionserver.global.memstore.size.lower.limit(默认值0.95) * hbase.regionserver.global.memstore.size(默认值0.4，表示40%) * hbase_heapsize(堆内存大小)`是，会触发MenStore的刷写。RegionServer 级别的Flush策略是每次找到 RS 中占用内存最大的 Region 对他进行刷写，这个操作是循环进行的，直到总体内存的占用低于全局 MemStore 刷写下限`（hbase.regionserver.global.memstore.size.lower.limit * hbase.regionserver.global.memstore.size * hbase_heapsize）`才会停止
 
-需要注意的是，如果达到了RegionServer级别的Flush，那么当前RegionServer的所有写操作将会被阻塞，而且这个阻塞可能会持续到分钟级别
+需要注意的是，如果达到了RegionServer级别的flush，那么当前RegionServer的所有写操作将会被阻塞，而且这个阻塞可能会持续到分钟级别
+
+- HBase定期刷新Memstore：默认周期( `hbase.regionserver.optionalcacheflushinterval`)为1小时，确保MemStore不会长时间没有持久化。为避免所有的MemStore在同一时间都进行flush导致的问题，定期的flush操作有20000左右的随机延时
+- 手动执行flush：用户可以通过shell命令 flush \<tablename\>或者flush \<region name\>分别对一个表或者一个Region进行flush
 
 # 2 部署
 
