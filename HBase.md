@@ -93,6 +93,29 @@ Reference：[HBase架构](https://www.huaweicloud.com/articles/31192a16656cfe228
 >
 > 最高的序列号（sequence number）被作为一个meta field 保存在每个 HFile 中，以此反应持久化终止在哪，并应从哪里继续。当一个region 启动后，序列号会被读取，然后最高的会被用于最新编辑操作的序列号
 
+### 1.3.2 Memstore Flush
+
+Reference: 
+
+[HBase – Memstore Flush深度解析](http://hbasefly.com/2016/03/23/hbase-memstore-flush/)
+
+[HBase 入门之数据刷写(Memstore Flush)详细说明](https://www.iteblog.com/archives/2497.html#comments)(注意看评论提到点应该是单个Menstore的flush而不是作者说的所有)
+
+#### Memstore 概述
+
+> HBase中，Region是集群节点上最小的数据服务单元，用户数据表由一个或多个Region组成。在Region中每个ColumnFamily的数据组成一个Store。每个Store由一个Memstore和多个HFile组成，如下图所示：
+>
+> ![image-20210802135746986](assets/image-20210802135746986.png)
+
+#### MenStore Flush触发条件
+
+- MemStore级别限制：当Region中任意一个MenStore的大小达到上限(`hbase.hregion.memstore.flush.size，默认128MB`)，会触发Memstore刷写
+
+- Region级别限制：随着数据的增长，Region中**所有**的MemStore达到了`hbase.hregion.memstore.flush.size * hbase.hregion.memstore.block.multiplier(默认值4)`，也就是`128 * 4 = 512MB`的时候，除了触发刷写之外，HBase还会在刷写的时候阻塞所有写入该Store的写请求
+- RegionServer级别限制：如果整个RegionServer的MenStore暂用内存总和大于`hbase.regionserver.global.memstore.size.lower.limit(默认值0.95) * hbase.regionserver.global.memstore.size(默认值0.4，表示40%) * hbase_heapsize(堆内存大小)`是，会触发MenStore的刷写。RegionServer 级别的Flush策略是每次找到 RS 中占用内存最大的 Region 对他进行刷写，这个操作是循环进行的，直到总体内存的占用低于全局 MemStore 刷写下限`（hbase.regionserver.global.memstore.size.lower.limit * hbase.regionserver.global.memstore.size * hbase_heapsize）`才会停止
+
+需要注意的是，如果达到了RegionServer级别的Flush，那么当前RegionServer的所有写操作将会被阻塞，而且这个阻塞可能会持续到分钟级别
+
 # 2 部署
 
 HBase依赖于ZooKeeper和Hadoop，安装HBase之前先将ZooKeeper和Hadoop部署并启动
