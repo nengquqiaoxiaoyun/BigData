@@ -67,8 +67,8 @@ Reference：
 > 一个 Region Server 运行在一个 HDFS data node，并拥有以下组件：
 >
 > 1. WAL：预写日志（Write Ahead Log）是存在分布式文件系统里的一个文件。WAL 用于存储还没有被持久化到永久性存储的新数据。也被用于在发生failure时做recovery
-> 2. BlockCache：**读缓存**。它存储最频繁被读取的数据在内存中。在缓存满后，最长时间未被访问的数据（Least Recently Used）会被替换掉
-> 3. MemStore：写缓存，它保存所有尚未写入到disk 的新数据。新数据在被写入到disk 之前会先存储到MemStore。每个region下的每个列族（column family）会有一个 MemStore
+> 2. BlockCache：**读缓存**（内存），它存储最频繁被读取的数据在内存中。在缓存满后，最长时间未被访问的数据（Least Recently Used）会被替换掉
+> 3. MemStore：写缓存（内存），它保存所有尚未写入到disk 的新数据。新数据在被写入到disk 之前会先存储到MemStore。每个region下的每个列族（column family）会有一个 MemStore
 > 4. HFile：保存行（rows），以排序好的 KeyValues 形式，保存在disk
 
 ## 1.3 HBase第一次读写
