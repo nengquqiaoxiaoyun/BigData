@@ -52,11 +52,20 @@ Reference：[HBase架构](https://www.huaweicloud.com/articles/31192a16656cfe228
 
 ![image-20210727154322480](assets/image-20210727154322480.png)
 
-![image-20210727154756818](assets/image-20210727154756818.png)
-
 > HBase 的主从结构主要由三部分组成。Region Server 用于服务数据的读写，当访问数据时，客户端直接与 HBase RegionServer 交互
 >
 > Region 的分配（region assignment），DDL（create，delete tables）的操作由 HBase Master 处理。Zookeepr，作为HDFS的一部分，用于维持一个活跃的集群状态
+
+### Region Server组件
+
+![image-20210803090724000](assets/image-20210803090724000.png)
+
+> 一个 Region Server 运行在一个 HDFS data node，并拥有以下组件：
+>
+> 1. WAL：预写日志（Write Ahead Log）是存在分布式文件系统里的一个文件。WAL 用于存储还没有被持久化到永久性存储的新数据。也被用于在发生failure时做recovery
+> 2. BlockCache：**读缓存**。它存储最频繁被读取的数据在内存中。在缓存满后，最长时间未被访问的数据（Least Recently Used）会被替换掉
+> 3. MemStore：写缓存，它保存所有尚未写入到disk 的新数据。新数据在被写入到disk 之前会先存储到MemStore。每个region下的每个列族（column family）会有一个 MemStore
+> 4. HFile：保存行（rows），以排序好的 KeyValues 形式，保存在disk
 
 ## 1.3 HBase第一次读写
 
@@ -71,6 +80,8 @@ Reference：[HBase架构](https://www.huaweicloud.com/articles/31192a16656cfe228
 > 对于之后的读操作，客户端使用缓存获取 META的位置，以及之前访问过的行键。随着时间的推移，客户端可以不需要query META 表，除非在访问时返回 miss（由于region被移动），然后客户端会 re-query 并更新缓存
 
 ![image-20210730110326245](assets/image-20210730110326245.png)
+
+无论读写都会先执行以上步骤，然后在走读写流程
 
 ### 1.3.1 HBase写
 
@@ -93,7 +104,29 @@ Reference：[HBase架构](https://www.huaweicloud.com/articles/31192a16656cfe228
 >
 > 最高的序列号（sequence number）被作为一个meta field 保存在每个 HFile 中，以此反应持久化终止在哪，并应从哪里继续。当一个region 启动后，序列号会被读取，然后最高的会被用于最新编辑操作的序列号
 
-### 1.3.2 Memstore Flush
+### 1.3.2 HBase读
+
+#### HFile索引
+
+![image-20210803091016552](assets/image-20210803091016552.png)
+
+注意上图，在HFile被打开时（被访问），索引（index）会被载入并保存在内存（BlockCache就是另一种内存），它允许查询在一个磁盘搜索内操作内完成
+
+#### HBase读
+
+> 我们已经知道一个行的KeyValue cells 会被存储在多个地方，row cells 已经被持久化到 HFile，最近被更新的 cells在MemSotre，并且最近被读过的 cells 会在 Block Cache。所以当读某一个行时，系统如何得到对应的 cells 返回？
+>
+> 一个读的操作会从BlockCache、MemStore以及HFile集合Key Values，步骤如下：
+>
+> 1. 首先，Scanner会在Block Cache 搜索 Row cells。最近被读过的 Key Values 被缓存到这，并且，如内存需要，最常时间未使用的会被替换掉
+> 2. 然后 scanner会在 MemStore 里搜索，write cache（MemStore）里保有最近的写操作
+> 3. 如果scanner没有在MemStore以及Block Cache里找到所有的row cells，则HBase会使用Block Cache 索引以及bloom filter 加载HFiles 到内存，这些Hfiles可能包含目标的row cells
+>
+> ![image-20210803091729388](assets/image-20210803091729388.png)
+>
+> 每个MemStore可能会有多个HFiles，即是说：对于一个读操作，可能需要检查多个文件，并继而影响performance（性能）。这个被称为读放大（read amplification）
+
+## 1.4 Memstore Flush
 
 Reference: 
 
@@ -101,13 +134,13 @@ Reference:
 
 [HBase 入门之数据刷写(Memstore Flush)详细说明](https://www.iteblog.com/archives/2497.html#comments)(注意看评论提到点应该是单个Menstore的flush而不是作者说的所有)
 
-#### Memstore 概述
+### Memstore 概述
 
 > HBase中，Region是集群节点上最小的数据服务单元，用户数据表由一个或多个Region组成。在Region中每个ColumnFamily的数据组成一个Store。每个Store由一个Memstore和多个HFile组成，如下图所示：
 >
 > ![image-20210802135746986](assets/image-20210802135746986.png)
 
-#### MenStore Flush触发条件
+### MenStore Flush触发条件
 
 - MemStore级别限制：当Region中任意一个MenStore的大小达到上限(`hbase.hregion.memstore.flush.size，默认128MB`)，会触发Memstore刷写
 
