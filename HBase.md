@@ -46,7 +46,11 @@ HBase作为Google BigTable的开源实现，完整地继承了BigTable的优良�
 
 ## 1.2 实现
 
-Reference：[HBase架构](https://www.huaweicloud.com/articles/31192a16656cfe2280689f3866e7cbb8.html)
+Reference：
+
+[HBase架构](https://www.huaweicloud.com/articles/31192a16656cfe2280689f3866e7cbb8.html)
+
+[深入理解HBase架构（翻译）](https://segmentfault.com/a/1190000019959411)(该文和上面得参考是一样的，不过有自己的点评)
 
 正如HDFS和YARN是有客户端、从属机（slave）和协调主控机（master）组成，HBase也采用相同的模型，它用一个`master`节点协调管理一个或多个`regionserver`从属机
 
@@ -151,6 +155,135 @@ Reference:
 
 - HBase定期刷新Memstore：默认周期( `hbase.regionserver.optionalcacheflushinterval`)为1小时，确保MemStore不会长时间没有持久化。为避免所有的MemStore在同一时间都进行flush导致的问题，定期的flush操作有20000左右的随机延时
 - 手动执行flush：用户可以通过shell命令 flush \<tablename\>或者flush \<region name\>分别对一个表或者一个Region进行flush
+
+## 1.5 Compaction
+
+由于MemStore每次Flush都会生成一个新的HFile，且同一个字段的不同版本（timestamp）和不同类型（Put/Delete）有可能会分布在不同的HFile中，因此查询时需要遍历所有的HFile。为了减少HFile的个数，以及清理掉过期和删除的数据，会进行Compaction
+
+### HBase Minor Compaction
+
+Minor Compaction会自动和并一些小的HFile，**重写**成少量更大的HFiles，但是不会清楚过期和已删除的数据（默认值为3，>=3时进行合并，且当>=3的Minor Compaction效果和Major Compaction效果一样，会从物理上删除过期数据）
+
+```xml
+<!-- hbase-default.xml 注意源码是 >= hbase.hstore.compactionThreshold -->  
+<property>
+    <name>hbase.hstore.compactionThreshold</name>
+    <value>3</value>
+    <description> If more than this number of StoreFiles exist in any one Store
+      (one StoreFile is written per flush of MemStore), a compaction is run to rewrite all
+      StoreFiles into a single StoreFile. Larger values delay compaction, but when compaction does
+      occur, it takes longer to complete.</description>
+</property>
+```
+
+### HBase Major Compaction
+
+Major Compaction将一个region中每个列族（一个列族就是一个MemStore，一个MemStore Flush出一个HFile）的HFile**重写**为一个新HFile
+
+在这个过程中，Major Compaction能扫描所有的键值对，顺序**重写**全部的数据，对于有删除标记的数据会被略过。而被删除和过期的数据会被真正从物理上删除，这样可以提高读的性能，但是因为Major Compaction会重写所有的文件，在这个过程中会产生大量的磁盘I/O以及网络开销，这被称为写放大（Write Amplification）
+
+Major Compaction可以被设定为自动调度，因为存在写放大的问题，它一般都安排在周末的半夜
+
+```xml
+<!-- hbase-default.xml 0为禁用 --> 
+<property>
+    <name>hbase.hregion.majorcompaction</name>
+    <value>604800000</value>
+    <description>Time between major compactions, expressed in milliseconds. Set to 0 to disable
+      time-based automatic major compactions. User-requested and size-based major compactions will
+      still run. This value is multiplied by hbase.hregion.majorcompaction.jitter to cause
+      compaction to start at a somewhat-random time during a given window of time. The default value
+      is 7 days, expressed in milliseconds. If major compactions are causing disruption in your
+      environment, you can configure them to run at off-peak times for your deployment, or disable
+      time-based major compactions by setting this parameter to 0, and run major compactions in a
+      cron job or by another external mechanism.</description>
+</property>
+
+<property>
+    <name>hbase.hregion.majorcompaction.jitter</name>
+    <value>0.50</value>
+    <description>A multiplier applied to hbase.hregion.majorcompaction to cause compaction to occur
+      a given amount of time either side of hbase.hregion.majorcompaction. The smaller the number,
+      the closer the compactions will happen to the hbase.hregion.majorcompaction
+      interval.</description>
+</property>
+```
+
+## 1.6 Region Split
+
+### Region = Contiguous Keys （连续的键）
+
+> 对 regions 做一个快速总结：
+>
+> 1. 一个表可以被水平的分配到一个或多个region中。一个region包含相邻的、排序的一段rows。范围从start key 到 end key。
+> 2. 每个region默认大小是1GB
+> 3. region里的数据由Region Server提供服务（读写），和client交互
+> 4. 一个region server 可以服务大约 1000 个regions（可能属于同一个表或是不同的表）
+>
+> ![image-20210803111601519](assets/image-20210803111601519.png)
+
+### Region Split
+
+> 一开始每个 table 默认只有一个 region。当一个 region 逐渐变得很大时，它会分裂（**split**）成两个子 region，每个子 region 都包含了原来 region 一半的数据，这两个子 region 并行地在原来这个 region server 上创建，这个分裂动作会被报告给 HMaster。处于负载均衡的目的，HMaster 可能会将新的 region 迁移给其它 region server
+>
+> ![image-20210803111621669](assets/image-20210803111621669.png)
+
+```xml
+  <property>
+    <name>hbase.hregion.max.filesize</name>
+    <value>10737418240</value>
+    <description>Maximum file size. If the sum of the sizes of a region's HFiles has
+      grown to exceed this value, the region is split in two. There are two choices of
+      how this option works, the first is when any store's size exceed the threshold
+      then split, and the other is overall region's size exceed the threshold then split,
+      it can be configed by hbase.hregion.split.overallfiles.</description>
+  
+</property>
+```
+
+### Split 触发策略
+
+Reference：
+
+[HBase Split 简介](https://www.jianshu.com/p/53459997c814)
+
+[HBase Region 自动拆分策略](https://cloud.tencent.com/developer/article/1374592)
+
+> HBase 中共有3种情况会触发 HBase Split：
+>
+> 1. 当 Memstore flush 操作后，HRegion 写入新的 HFile，有可能产生较大的 HFile，会判断是否需要执行 Split
+> 2. HStore 执行完成 Compact 操作后可能产生较大的 HFile，会判断是否需要执行 Split
+> 3. HBaseAdmin 手动执行 split 命令时，会触发 Split
+>
+> 目前已经的支持触发策略多达6种，每种触发策略都有各自的适用场景，可以根据业务在表级别（Column family 级别）选择不同的切分触发策略。一般情况下使用默认切分策略即可。
+>
+> - **ConstantSizeRegionSplitPolicy**：0.94版本前默认切分策略。
+>    一个 Region 中最大 Store 的大小大于设置阈值之后才会触发切分，Store 大小为压缩后的文件大小（启用压缩的场景）
+>    切分策略对于大表和小表没有明显的区分
+> - **IncreasingToUpperBoundRegionSplitPolicy**：0.94版本~2.0版本默认切分策略。
+>    和 ConstantSizeRegionSplitPolicy 思路相同，一个 Region 中最大 Store 大小大于设置阈值就会触发切分，区别是这个阈值并不像 ConstantSizeRegionSplitPolicy 是一个固定的值，而是会在不断调整。
+>    调整规则和 Region 所属表在当前 RegionServer 上的 Region 个数有关系 ：(#regions) * (#regions) * (#regions) * flush_size * 2，最大值为用户设置的 MaxRegionFileSize
+>    能够自适应大表和小表，这种策略下很多小表会在大集群中产生大量小 Region，分散在整个集群中
+> - **SteppingSplitPolicy**：2.0版本默认切分策略。
+>    相比 IncreasingToUpperBoundRegionSplitPolicy 简单了一些，依然和待分裂 Region 所属表在当前 RegionServer 上的 Region 个数有关系：如果 Region 个数等于1，切分阈值为 flush_size * 2，否则为 MaxRegionFileSize
+> - **DisableSplitPolicy**：禁止 Region split
+> - **KeyPrefixRegionSplitPolicy**：切分策略依然依据默认切分策略，根据 Rowkey 指定长度的前缀来切分 Region，保证相同的前缀的行保存在同一个 Region 中。由 KeyPrefixRegionSplitPolicy.prefix_length 属性指定 Rowkey 前缀长度。按此长度对splitPoint进行截取。
+>    此种策略比较适合有固定前缀的 Rowkey。当没有设置前缀长度，切分效果等同与 IncreasingToUpperBoundRegionSplitPolicy。
+> - **DelimitedKeyPrefixRegionSplitPolicy**：切分策略依然依据默认切分策略，同样是保证相同 RowKey 前缀的数据在一个Region中，但是是以指定分隔符前面的前缀为来切分 Region。
+
+```xml
+<property>
+    <name>hbase.regionserver.region.split.policy</name>
+    <value>org.apache.hadoop.hbase.regionserver.SteppingSplitPolicy</value>
+    <description>
+      A split policy determines when a region should be split. The various
+      other split policies that are available currently are BusyRegionSplitPolicy,
+      ConstantSizeRegionSplitPolicy, DisabledRegionSplitPolicy,
+      DelimitedKeyPrefixRegionSplitPolicy, KeyPrefixRegionSplitPolicy, and
+      SteppingSplitPolicy. DisabledRegionSplitPolicy blocks manual region splitting.
+    </description>
+</property>
+```
 
 # 2 部署
 
