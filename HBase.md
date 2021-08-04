@@ -616,7 +616,7 @@ ROW                                            COLUMN+CELL
 hbase(main):011:0> delete 'ck:stu', '1001', 'info:sex'
 0 row(s) in 0.0330 seconds
 
-# 删除某个row key的所有数据
+# 删除某个row key的所有数据 注意这边删除整个列族delete是删不了的需要用deleteall命令，而客户端API是可以删除的
 hbase(main):021:0> deleteall 'ck:stu', '1001'
 0 row(s) in 0.0040 seconds
 
