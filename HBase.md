@@ -657,3 +657,213 @@ hbase(main):031:0> drop 'ck:stu'
 0 row(s) in 1.2640 seconds
 ```
 
+# 3 API
+
+环境依赖如下
+
+```xml
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-client</artifactId>
+            <version>1.3.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-server</artifactId>
+            <version>1.3.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+        </dependency>
+    </dependencies>
+```
+
+API测试方法如下，尤其需要注意API的删除数据操作
+
+```java
+package cn.huakai;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
+
+public class HBaseAPI {
+
+    private static HBaseAdmin admin;
+    private static Configuration conf;
+
+    static {
+        try {
+            conf = HBaseConfiguration.create();
+            conf.set("hbase.zookeeper.quorum", "hadoop102,hadoop103,hadoop104");
+
+            admin = (HBaseAdmin) ConnectionFactory.createConnection(conf).getAdmin();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }                                       
+    }
+
+
+    @Test
+    public void delete() throws IOException {
+        String tb = "stu";
+        HTable table = (HTable) ConnectionFactory.createConnection(conf).getTable(TableName.valueOf(tb));
+
+
+        Delete delete = new Delete("1002".getBytes(StandardCharsets.UTF_8));
+        /*
+          注意：尽量不要使用 delete.addColumn()
+          如果有多个Version使用该方法会导致删除最大的时间戳之后 会查询到先前的数据
+         */
+        delete.addColumns("info".getBytes(), "name".getBytes(StandardCharsets.UTF_8));
+
+        table.delete(delete);
+        System.out.println("delete successful");
+
+        table.close();
+
+    }
+
+
+    @Test
+    public void get() throws IOException {
+        String tb = "stu";
+        HTable table = (HTable) ConnectionFactory.createConnection(conf).getTable(TableName.valueOf(tb));
+
+        Get get = new Get("1001".getBytes());
+        Result result = table.get(get);
+
+        System.out.println("get: ");
+        for (Cell cell : result.rawCells()) {
+            String cf = Bytes.toString(CellUtil.cloneFamily(cell));
+            String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
+            String value = Bytes.toString(CellUtil.cloneValue(cell));
+            System.out.println("cf: " + cf + ", qualifier: " + qualifier + ", value: " + value);
+        }
+
+
+        table.close();
+    }
+
+
+    @Test
+    public void put() throws IOException {
+        String tb = "stu";
+        HTable table = (HTable) ConnectionFactory.createConnection(conf).getTable(TableName.valueOf(tb));
+
+        Put put = new Put(Bytes.toBytes("1001"));
+        put.addColumn("info".getBytes(), "name".getBytes(), "张三".getBytes(StandardCharsets.UTF_8));
+        put.addColumn("info".getBytes(), "age".getBytes(), "18".getBytes());
+        table.put(put);
+
+        System.out.println("DML put successful...");
+
+        table.close();
+
+    }
+
+
+    @Test
+    public void listTables() throws IOException {
+        HTableDescriptor[] hTableDescriptors = admin.listTables();
+        System.out.println("list: ");
+        Arrays.stream(hTableDescriptors).forEach(td -> System.out.println(td.getTableName().getNameAsString()));
+        close();
+    }
+
+    @Test
+    public void listNameSpace() throws IOException {
+
+        NamespaceDescriptor[] namespaceDescriptors = admin.listNamespaceDescriptors();
+
+        System.out.println("list namespace: ");
+
+        Arrays.stream(namespaceDescriptors).forEach(ns -> System.out.println(ns.getName()));
+
+        close();
+    }
+
+
+    @Test
+    public void createNameSpace() throws IOException {
+        String ns = "ck2";
+
+        NamespaceDescriptor.Builder builder = NamespaceDescriptor.create(ns);
+        NamespaceDescriptor build = builder.build();
+        admin.createNamespace(build);
+        System.out.println("create namespace: " + ns + " successful");
+
+        close();
+    }
+
+
+    @Test
+    public void dropTable() throws IOException {
+        String tableName = "ck:stu";
+
+        admin.disableTable(tableName);
+        System.out.println("table: " + tableName + " has disabled");
+
+        admin.deleteTable(tableName);
+        System.out.println(tableName + "deleted successful");
+
+        close();
+    }
+
+
+    @Test
+    public void createTable() throws IOException {
+        String tableName = "ck:stu";
+
+        HTableDescriptor hTableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
+        HColumnDescriptor columnDescriptor = new HColumnDescriptor("info");
+        hTableDescriptor.addFamily(columnDescriptor);
+
+        if (admin.tableExists(tableName)) {
+            System.out.println("table is exist! Do not create again");
+            return;
+        }
+
+        admin.createTable(hTableDescriptor);
+        System.out.println("talbe creates successful");
+
+        close();
+    }
+
+
+    @Test
+    public void isTableExist() throws IOException {
+        String tableName = "stu";
+
+        if (admin.tableExists(tableName)) {
+            System.out.println("table is exist");
+            return;
+        }
+
+        System.out.println("table is not exist");
+        close();
+    }
+
+    public void close() {
+        try {
+            admin.close();
+            System.out.println("--- close admin ---");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
