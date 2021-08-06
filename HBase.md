@@ -874,3 +874,98 @@ public class HBaseAPI {
 }
 ```
 
+# 4 HBase And MapReduce
+
+Refenence：
+
+[HBase And MapReduce](https://www.cntofu.com/book/173/docs/8.md)
+
+默认情况下，部署在 MapReduce 集群中的 MapReduce jobs 没有权限访问`$HBASE_CONF_DIR`路径下的 HBase 配置 或者 HBase classes
+
+使用命令查看mapredcp任务需要的依赖
+
+```shell
+# $HBASE_HOME目录下
+[hadoop@hadoop102 hbase-2.3.6]$  bin/hbase mapredcp
+/opt/module/hbase-2.3.6/lib/shaded-clients/hbase-shaded-mapreduce-2.3.6.jar:/opt/module/hbase-2.3.6/lib/client-facing-thirdparty/audience-annotations-0.5.0.jar:/opt/module/hbase-2.3.6/lib/client-facing-thirdparty/commons-logging-1.2.jar:/opt/module/hbase-2.3.6/lib/client-facing-thirdparty/htrace-core4-4.2.0-incubating.jar:/opt/module/hbase-2.3.6/lib/client-facing-thirdparty/log4j-1.2.17.jar:/opt/module/hbase-2.3.6/lib/client-facing-thirdparty/slf4j-api-1.7.30.jar
+```
+
+有如下方式可以为MapReduce jobs配置权限
+
+> 增加 *hbase-site.xml* 到 *$HADOOP_HOME/conf*
+> 然后将 HBase jars 添加到 *$HADOOP_HOME/lib* 目录下
+> 最后需要将这些变更拷贝到 Hadoop 集群中所有服务上
+
+或者
+
+> 编辑 *$HADOOP_HOME/etc/hadoop/hadoop-env.sh* 将 HBase 依赖添加到 `HADOOP_CLASSPATH`
+>
+> export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:\$HBASE_HOME/lib/*
+
+上面的方式不推荐因为会让Hadoop安装HBase的依赖，并且需要重启Hadoop集群才能使用HBase中的数据
+
+> The recommended approach is to let HBase add its dependency jars and use `HADOOP_CLASSPATH` or `-libjars`
+
+推荐的方式是使用`HADOOP_CLASSPATH`或者`-libjars`让HBase添加它的依赖jars（这句话硬是没看懂，主要是不明白HADOOP_CLASSPATH是什么，后面的-libjars应该是一种附加jar的方式）
+
+还有一种方式是执行环境变量的导入（临时生效）
+
+```shell
+export HADOOP_CLASSPATH=`${HBASE_HOME}/bin/hbase mapredcp`
+```
+
+----
+
+`hbase-mapreduce.jar` 核心是一个驱动,罗列了 HBASE 装载的一些基础的 MapReduce 任务
+
+```shell
+[hadoop@hadoop102 hbase-2.3.6]$ ${HADOOP_HOME}/bin/hadoop jar ${HBASE_HOME}/lib/hbase-mapreduce-2.3.6.jar
+An example program must be given as the first argument.
+Valid program names are:
+  CellCounter: Count cells in HBase table.
+  WALPlayer: Replay WAL files.
+  completebulkload: Complete a bulk data load.
+  copytable: Export a table from local cluster to peer cluster.
+  export: Write table data to HDFS.
+  exportsnapshot: Export the specific snapshot to a given FileSystem.
+  import: Import data written by Export.
+  importtsv: Import data in TSV format.
+  mobrefs: Check the mob cells in a particular table and cf and confirm that the files they point to are correct.
+  rowcounter: Count rows in HBase table.
+  verifyrep: Compare data from tables in two different clusters. It doesn't work for incrementColumnValues'd cells since timestamp is changed after appending to WAL.
+```
+
+可以使用上面列出的MapReduce任务的简写来执行任务，比如统计表行数
+
+```shell
+${HADOOP_HOME}/bin/hadoop jar ${HBASE_HOME}/lib/hbase-mapreduce-2.3.6.jar rowcounter stu
+```
+
+## 使用MapReduce将本地数据导入到HBase
+
+数据如下：
+
+```tsv
+1001	Apple	Red
+1002	Pear	Yellow
+1003	Pineapple	Yellow
+```
+
+hdfs本地创建tsv文件并上传
+
+```shell
+# $HADOOP_HOME
+vim fruit.tsv
+
+hadoop dfs -put fruit.tsv /Fruit/
+```
+
+> 制表符分隔值 （Tab-separated values，TSV）格式文件是一种用于储存数据的文本格式文件，其数据以表格结构（例如数据库 或电子表格 数据）储存。 每一行储存一条记录。 每条记录的各个字段间以制表符（Tab,'\t'）作为分隔。 TSV 格式是一种被广泛支持的文件格式，它经常用来在不同的计算机程序之间传递数据，支持格式。
+
+执行MapReduce将tsv写入到fruit表中，这一步需要确定转换时的属性
+
+```shell
+# 确保fruit以创建，且列族一直，无需指定列名，参数中指定即可
+$HADOOP_HOME/bin/hadoop jar $HBASE_HOME/lib/hbase-mapreduce-2.3.6.jar importtsv  -D importtsv.columns=HBASE_ROW_KEY,info:name,info:color fruit hdfs://hadoop102:8020/Fruit
+```
+
