@@ -287,12 +287,18 @@ Reference：
 
 # 2 部署
 
+> 下表总结了每个 HBase 版本支持的 Hadoop 版本。下表总结了每个版本的 HBase 支持的 Hadoop 版本。未出现在此表中的旧版本被视为不受支持，可能缺少必要的功能，而新版本未经测试，但可能适用
+>
+> ![image-20210805090935889](assets/image-20210805090935889.png)
+
+> HBase 有两种运行模式：独立式和分布式。HBase 以独立模式运行。无论您的模式如何，您都需要通过编辑 HBase *conf* 目录中的文件来配置 HBase 。至少，您必须编辑 conf/hbase-env.sh 来告诉 HBase 要使用哪个 java。在这个文件中，你设置了 HBase 环境变量，比如`JVM`的 heapsize 和其他选项，日志文件的首选位置等等。设置 JAVA_HOME 以指向你的 java 安装的根目录
+
 HBase依赖于ZooKeeper和Hadoop，安装HBase之前先将ZooKeeper和Hadoop部署并启动
 
 将HBase解压至指定目录
 
 ```shell
-tar -zxvf hbase-1.3.1-bin.tar.gz -C /opt/module
+tar -zxvf hbase-2.3.6-bin.tar.gz -C /opt/module/
 ```
 
 修改配置文件(这边使用$hbase表示hbase主目录)
@@ -302,6 +308,7 @@ tar -zxvf hbase-1.3.1-bin.tar.gz -C /opt/module
 ```shell
 # $JAVA_HOME根据自身情况替换为实际路径
 export JAVA_HOME=$JAVA_HOME
+# 禁用让HBASE自己管理ZOOKEEPER
 export HBASE_MANAGES_ZK=false
 ```
 
@@ -355,9 +362,9 @@ hadoop104
 
 ```shell
 # core-site 这边我的Hadoop路径为/opt/module/hadoop-3.1.3
-# 我的实际操作位 ln -s /opt/module/hadoop-3.1.3/etc/hadoop/core-site.xml /opt/module/hbase-1.3.1/conf/core-site.xm
+# 我的实际操作位 ln -s /opt/module/hadoop-3.1.3/etc/hadoop/core-site.xml /opt/module/hbase-2.3.6/conf/core-site.xml
 # 下同
-ln -s $HADOOP_HOME/etc/hadoop/core-site.xml $hbase/conf/core-site.xm
+ln -s $HADOOP_HOME/etc/hadoop/core-site.xml $hbase/conf/core-site.xml
 # hdfs-site
 # ln -s /opt/module/hadoop-3.1.3/etc/hadoop/hdfs-site.xml /opt/module/hbase-1.3.1/conf/hdfs-site.xml
 ln -s $HADOOP_HOME/etc/hadoop/hdfs-site.xml $hbase/conf/hdfs-site.xml
