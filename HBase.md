@@ -1098,3 +1098,6 @@ public class Application {
 }
 ```
 
+打包后放到Hadoop主目录下运行`hadoop jar <jarName> <mainReference>`
+
+- 案例二：HBase表中的数据通过MapReduce处理放入到另一张表中
