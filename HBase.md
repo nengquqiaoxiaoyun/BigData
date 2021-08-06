@@ -969,3 +969,132 @@ hadoop dfs -put fruit.tsv /Fruit/
 $HADOOP_HOME/bin/hadoop jar $HBASE_HOME/lib/hbase-mapreduce-2.3.6.jar importtsv  -D importtsv.columns=HBASE_ROW_KEY,info:name,info:color fruit hdfs://hadoop102:8020/Fruit
 ```
 
+## 交互
+
+- 将hdfs文件中的数据传入HBase中
+
+不在需要设置输出路径，因为是从HDFS到HBase，所以输入路径还是和原来一样需要指定文件，而输出路径需要用`TableMapReduceUtil.initTableReducerJob`来指定相关参数
+
+```java
+package cn.huakai.mr;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableReducer;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.util.Tool;
+
+import java.io.IOException;
+
+/**
+ * 将hdfs文件的数据放入hbase
+ * 1001	Apple	Red
+ * 1002	Pear	Yellow
+ * 1003	Pineapple	Yellow
+ *
+ * @author: huakaimay
+ * @since: 2021-08-06
+ */
+public class TranserDriver implements Tool {
+
+    private Configuration configuration;
+
+    @Override
+    public int run(String[] args) throws Exception {
+        Job job = Job.getInstance(configuration);
+        job.setJarByClass(TranserDriver.class);
+
+        System.err.println(job.getConfiguration() == null);
+
+        // 从文件中获取数据 hdfs ==> hbase(util)
+        FileInputFormat.setInputPaths(job, new Path("/Fruit"));
+
+        job.setMapperClass(TranserMapper.class);
+        job.setMapOutputKeyClass(ImmutableBytesWritable.class);
+        job.setMapOutputValueClass(Put.class);
+
+        TableMapReduceUtil.initTableReducerJob(
+                "fruit2",
+                TranserReducer.class,
+                job
+        );
+
+
+        return job.waitForCompletion(true) ? 0 : 1;
+    }
+
+    @Override
+    public void setConf(Configuration conf) {
+        configuration = conf;
+    }
+
+    @Override
+    public Configuration getConf() {
+        return configuration;
+    }
+
+    /**
+     * 1001	Apple	Red
+     * 1002	Pear	Yellow
+     * 1003	Pineapple	Yellow
+     */
+    public static class TranserMapper extends Mapper<LongWritable, Text, ImmutableBytesWritable, Put> {
+
+        @Override
+        protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            String[] values = value.toString().split("\t");
+            String rowKey = values[0];
+            String name = values[1];
+            String color = values[2];
+
+            Put put = new Put(rowKey.getBytes());
+            put.addColumn("info".getBytes(), "name".getBytes(), name.getBytes());
+            put.addColumn("info".getBytes(), "color".getBytes(), color.getBytes());
+
+            ImmutableBytesWritable keyOut = new ImmutableBytesWritable(rowKey.getBytes());
+            context.write(keyOut, put);
+
+        }
+    }
+
+    public static class TranserReducer extends TableReducer<ImmutableBytesWritable, Put, NullWritable> {
+        @Override
+        protected void reduce(ImmutableBytesWritable key, Iterable<Put> values, Context context) throws IOException, InterruptedException {
+
+            for (Put value : values) {
+                context.write(NullWritable.get(), value);
+            }
+
+        }
+    }
+}
+```
+
+```java
+package cn.huakai.mr;
+
+import org.apache.hadoop.util.ToolRunner;
+
+/**
+ * @author: huakaimay
+ * @since: 2021-08-06
+ */
+public class Application {
+    public static void main(String[] args) {
+        try {
+            ToolRunner.run(new TranserDriver(), args);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
