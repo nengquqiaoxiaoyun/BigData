@@ -906,7 +906,7 @@ Refenence：
 
 > The recommended approach is to let HBase add its dependency jars and use `HADOOP_CLASSPATH` or `-libjars`
 
-推荐的方式是使用`HADOOP_CLASSPATH`或者`-libjars`让HBase添加它的依赖jars（这句话硬是没看懂，主要是不明白HADOOP_CLASSPATH是什么，后面的-libjars应该是一种附加jar的方式）
+推荐的方式是使用`HADOOP_CLASSPATH`或者`-libjars`让HBase添加它的依赖jars（这句话硬是没看懂，主要是不明白HADOOP_CLASSPATH是什么，后面的-libjars应该是一种附加jar的方式 [How HBase add its dependency jars and use HADOOP_CLASSPATH](https://stackoverflow.com/questions/68675185/how-hbase-add-its-dependency-jars-and-use-hadoop-classpath)）
 
 还有一种方式是执行环境变量的导入（临时生效）
 
@@ -1101,3 +1101,96 @@ public class Application {
 打包后放到Hadoop主目录下运行`hadoop jar <jarName> <mainReference>`
 
 - 案例二：HBase表中的数据通过MapReduce处理放入到另一张表中
+
+案列本身没有难度，注意job和普通Driver的区别即可
+
+```java
+package cn.huakai.db2db;
+
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.hbase.mapreduce.TableReducer;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.util.Tool;
+
+import java.io.IOException;
+
+/**
+ * 将HBase中表 fruit2 的数据转移到 fruit3 中
+ *
+ * @author: huakaimay
+ * @since: 2021-08-09
+ */
+public class DbDriverTool extends Configured implements Tool {
+
+
+    @Override
+    public int run(String[] args) throws Exception {
+        Job job = Job.getInstance();
+        job.setJarByClass(DbDriverTool.class);
+
+        Scan scan = new Scan();
+        scan.setCacheBlocks(false);
+        scan.setCaching(500);
+
+        TableMapReduceUtil.initTableMapperJob(
+                "fruit2",
+                scan,
+                DbMapper.class,
+                ImmutableBytesWritable.class,
+                Put.class,
+                job
+        );
+
+
+        TableMapReduceUtil.initTableReducerJob(
+                "fruit3",
+                DbReducer.class,
+                job
+        );
+
+        return job.waitForCompletion(true) ? 0 : 1;
+    }
+
+    public static class DbMapper extends TableMapper<ImmutableBytesWritable, Put> {
+
+        @Override
+        protected void map(ImmutableBytesWritable key, Result value, Mapper.Context context) throws IOException, InterruptedException {
+            Put put = new Put(key.get());
+
+            Cell[] cells = value.rawCells();
+            for (Cell cell : cells) {
+                put.addColumn(
+                        CellUtil.cloneFamily(cell),
+                        CellUtil.cloneQualifier(cell),
+                        CellUtil.cloneValue(cell)
+                );
+            }
+            context.write(key, put);
+        }
+
+    }
+
+
+    public static class DbReducer extends TableReducer<ImmutableBytesWritable, Put, NullWritable> {
+
+        @Override
+        protected void reduce(ImmutableBytesWritable key, Iterable<Put> values, Context context) throws IOException, InterruptedException {
+            for (Put value : values) {
+                context.write(NullWritable.get(), value);
+            }
+        }
+    }
+
+}
+```
+
