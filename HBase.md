@@ -1194,3 +1194,11 @@ public class DbDriverTool extends Configured implements Tool {
 }
 ```
 
+# 5 Coprocessors协处理器
+
+Reference:
+
+[协处理器介绍及案例](https://www.bilibili.com/video/BV1Nt4y117CX?p=24)
+
+[HBase 协处理器详解](https://www.bookstack.cn/read/BigData-Notes/notes-Hbase%E5%8D%8F%E5%A4%84%E7%90%86%E5%99%A8%E8%AF%A6%E8%A7%A3.md)
+
