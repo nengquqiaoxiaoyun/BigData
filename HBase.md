@@ -1202,3 +1202,44 @@ Reference:
 
 [HBase 协处理器详解](https://www.bookstack.cn/read/BigData-Notes/notes-Hbase%E5%8D%8F%E5%A4%84%E7%90%86%E5%99%A8%E8%AF%A6%E8%A7%A3.md)
 
+# 6 优化
+
+Reference:
+
+[HBase 常用优化策略](https://www.huaweicloud.com/articles/12568269.html)
+
+## 6.1 高可用
+
+在HBase中HMaster负责监控HRegionServer的生命周期，均衡RegionServer的负载，如果HMaster挂掉了，那么整个HBase集群将陷入不健康的状态，并且此时的工作状态并不会维持太久
+
+我们可以对HBase集群配置高可用
+
+首先确保集群已关闭（非关闭状态下可以直接启动Master服务即可保证高可用）
+
+```shell
+# $HBASE_HOME
+bin/stop-hbase.sh
+
+# $HBASE_HOME 录入备份Master节点
+vim conf/backup-masters
+
+# 启动即可
+bin/start-hbase.sh
+```
+
+## 6.2 预分区
+
+Reference:
+
+[HBase预分区基本概念](https://www.huaweicloud.com/articles/12470154.html)
+
+建表时手动设定预分区
+
+```shell
+create 'staff','info',SPLITS => ['1000','2000','3000','4000']
+```
+
+![image-20210809151146521](assets/image-20210809151146521.png)
+
+![image-20210809151157146](assets/image-20210809151157146.png)
+
