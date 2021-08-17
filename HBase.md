@@ -42,7 +42,7 @@ HBase自动把表水平划分成区域（Region），每个区域都由表中行
 
 ![image-20210727153415168](assets/image-20210727153415168.png)
 
-HBase作为Google BigTable的开源实现，完整地继承了BigTable的优良设计。架构上通过数据分片的设计配合HDFS，实现了数据的分布式海量存储；数据结构上通过列族的设计，实现了数据表结构可以在运行期自定义；存储上通过LSM树的方式，使数据可以通过连续写磁盘的方式保存数据，极大地提高了数据写入性能
+HBase作为Google BigTable的开源实现，完整地继承了BigTable的优良设计。架构上通过数据分片的设计配合HDFS，实现了数据的分布式海量存储。数据结构上通过列族的设计，实现了数据表结构可以在运行期自定义。存储上通过LSM树的方式，使数据可以通过连续写磁盘的方式保存数据，极大地提高了数据写入性能
 
 ## 1.2 实现
 
@@ -1222,6 +1222,7 @@ bin/stop-hbase.sh
 
 # $HBASE_HOME 录入备份Master节点
 vim conf/backup-masters
+hadoop103
 
 # 启动即可
 bin/start-hbase.sh
@@ -1242,4 +1243,45 @@ create 'staff','info',SPLITS => ['1000','2000','3000','4000']
 ![image-20210809151146521](assets/image-20210809151146521.png)
 
 ![image-20210809151157146](assets/image-20210809151157146.png)
+
+按照文件设定与分区，文件位置放在了`$HBASE_HOME`下
+
+```shell
+create 'staff','info',SPLITS_FILE=>'split.txt'
+```
+
+# 一些异常处理
+
+## ERROR: org.apache.hadoop.hbase.PleaseHoldException: Master is initializing
+
+Reference：https://lihuimintu.github.io/2020/01/18/HBase-Master-is-initializing/
+
+通过异常一直发现和该文的问题一致，随后搜索日志中的异常
+
+```shell
+WARN org.apache.hadoop.hbase.master.HMaster: hbase:meta,,1.1588230740 is NOT online; state={1588230740 state=OPENING, 
+ts=1579334053311, server=region-168-1-240,16020,1579334037426}; ServerCrashProcedures=true. Master startup cannot 
+progress, in holding-pattern until region onlined.
+```
+
+找到如下方案：
+
+https://stackoverflow.com/questions/58092377/hbase-hbasemetadata-holds-info-about-non-existing-regionserver-id-master-s
+
+成功解决，
+
+![image-20210816103937405](assets/image-20210816103937405.png)
+
+这边应该是zk的版本不同所以命令和路径有所不同
+
+```shell
+[zk: localhost:2181(CONNECTED) 9] ls /
+[hbase, zookeeper]
+
+[zk: localhost:2181(CONNECTED) 10] ls /hbase 
+[backup-masters, draining, flush-table-proc, hbaseid, master, master-maintenance, meta-region-server, namespace, online-snapshot, rs, running, splitWAL, switch, table]
+
+[zk: localhost:2181(CONNECTED) 6] deleteall /hbase/meta-region-server
+deleteall /hbase/meta-region-server
+```
 
