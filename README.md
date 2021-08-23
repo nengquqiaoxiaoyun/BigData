@@ -76,3 +76,7 @@ RAID技术只是在单台服务器的多块磁盘上组成阵列，大数据需�
 # HBase
 
 [HBase](./HBase.md)
+
+# Hive
+
+[Hive](./Hive)
